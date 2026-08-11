@@ -9,12 +9,21 @@
 #' @return A named list of diagnostic tibbles.
 #' @export
 diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
+  diagnose_acroform_batch(out_dir, id_col = "audit_id", form_label = "HPAI BCAP", prefix = "hpai", container = "audits", write = write, quiet = quiet)
+}
+
+diagnose_acroform_batch <- function(out_dir, id_col = "audit_id", form_label = "HPAI BCAP", prefix = "hpai", container = "audits", write = TRUE, quiet = FALSE) {
   out_dir <- validate_scalar_path(out_dir, "out_dir")
   if (!dir.exists(out_dir)) stop("`out_dir` does not exist or is not a directory.", call. = FALSE)
-  fields <- .read_diagnostic_fields(out_dir)
-  metadata <- .read_diagnostic_metadata(out_dir)
-  widgets <- .read_diagnostic_widgets(out_dir)
+  fields <- .read_diagnostic_fields(out_dir, prefix = prefix, container = container)
+  metadata <- .read_diagnostic_metadata(out_dir, prefix = prefix, container = container)
+  widgets <- .read_diagnostic_widgets(out_dir, prefix = prefix, container = container)
   if (nrow(fields) == 0L) stop("No canonical logical field table was found in `out_dir`.", call. = FALSE)
+  if (!identical(id_col, "audit_id")) {
+    names(fields)[names(fields) == id_col] <- "audit_id"
+    names(metadata)[names(metadata) == id_col] <- "audit_id"
+    names(widgets)[names(widgets) == id_col] <- "audit_id"
+  }
 
   fields$field_type <- sub("^/", "", fields$field_type)
   fields$states_normalized <- vapply(fields$states, state_set_to_string, character(1))
@@ -36,6 +45,7 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
   field_order_differences <- .field_order_differences(fields)
   pairwise <- .schema_pairwise(fields, audit_ids)
   widget_differences <- .widget_encoding_candidates(fields, widgets)
+  field_option_differences <- .field_option_differences(fields)
 
   result <- list(
     summary = schema_summary,
@@ -45,16 +55,18 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
     field_presence_differences = field_presence_differences,
     field_type_differences = field_type_differences,
     field_state_differences = field_state_differences,
+    field_option_differences = field_option_differences,
     field_order_differences = field_order_differences,
     widget_differences = widget_differences
   )
-  if (isTRUE(write)) .write_diagnostics(result, out_dir)
+  if (!identical(id_col, "audit_id")) result <- .rename_diagnostic_id(result, id_col)
+  if (isTRUE(write)) .write_diagnostics(result, out_dir, form_label = form_label)
 
   counts <- schema_difference_counts(result)
   if (!quiet) {
     cli::cli_inform(paste0(
       counts$schemas, " normalized PDF schema", if (counts$schemas == 1L) "" else "s",
-      " detected across ", nrow(schema_summary), " audit", if (nrow(schema_summary) == 1L) "" else "s", "."
+      " detected across ", nrow(schema_summary), " form", if (nrow(schema_summary) == 1L) "" else "s", "."
     ))
     if (counts$schemas > 1L) {
       cli::cli_alert_warning(paste0(
@@ -70,10 +82,22 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
   result
 }
 
-.read_diagnostic_fields <- function(out_dir) {
-  combined <- fs::path(out_dir, "combined", "hpai_fields_long.csv")
+.rename_diagnostic_id <- function(result, id_col) {
+  rename_one <- function(x) {
+    if (!is.data.frame(x)) return(x)
+    names(x)[names(x) == "audit_id"] <- id_col
+    names(x)[names(x) == "audit_a"] <- paste0(id_col, "_a")
+    names(x)[names(x) == "audit_b"] <- paste0(id_col, "_b")
+    if (identical(id_col, "form_id")) names(x)[names(x) == "audit_ids"] <- "form_ids"
+    x
+  }
+  purrr::map(result, rename_one)
+}
+
+.read_diagnostic_fields <- function(out_dir, prefix = "hpai", container = "audits") {
+  combined <- fs::path(out_dir, "combined", paste0(prefix, "_fields_long.csv"))
   if (file.exists(combined)) return(readr::read_csv(combined, show_col_types = FALSE))
-  audit_dirs <- list.dirs(fs::path(out_dir, "audits"), recursive = FALSE, full.names = TRUE)
+  audit_dirs <- list.dirs(fs::path(out_dir, container), recursive = FALSE, full.names = TRUE)
   files <- unlist(lapply(audit_dirs, function(dir) {
     candidates <- list.files(dir, pattern = "_fields_long\\.csv$", full.names = TRUE)
     candidates[!grepl("_populated_fields_long\\.csv$", basename(candidates))]
@@ -82,19 +106,19 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
   dplyr::bind_rows(purrr::map(files, ~ readr::read_csv(.x, show_col_types = FALSE)))
 }
 
-.read_diagnostic_metadata <- function(out_dir) {
-  combined <- fs::path(out_dir, "combined", "hpai_metadata.csv")
+.read_diagnostic_metadata <- function(out_dir, prefix = "hpai", container = "audits") {
+  combined <- fs::path(out_dir, "combined", paste0(prefix, "_metadata.csv"))
   if (file.exists(combined)) return(readr::read_csv(combined, show_col_types = FALSE))
-  audit_dirs <- list.dirs(fs::path(out_dir, "audits"), recursive = FALSE, full.names = TRUE)
+  audit_dirs <- list.dirs(fs::path(out_dir, container), recursive = FALSE, full.names = TRUE)
   files <- unlist(lapply(audit_dirs, function(dir) list.files(dir, pattern = "_metadata\\.csv$", full.names = TRUE)), use.names = FALSE)
   if (length(files) == 0L) return(tibble::tibble())
   dplyr::bind_rows(purrr::map(files, ~ readr::read_csv(.x, show_col_types = FALSE)))
 }
 
-.read_diagnostic_widgets <- function(out_dir) {
-  combined <- fs::path(out_dir, "combined", "hpai_widgets.csv")
+.read_diagnostic_widgets <- function(out_dir, prefix = "hpai", container = "audits") {
+  combined <- fs::path(out_dir, "combined", paste0(prefix, "_widgets.csv"))
   if (file.exists(combined)) return(readr::read_csv(combined, show_col_types = FALSE))
-  audit_dirs <- list.dirs(fs::path(out_dir, "audits"), recursive = FALSE, full.names = TRUE)
+  audit_dirs <- list.dirs(fs::path(out_dir, container), recursive = FALSE, full.names = TRUE)
   files <- unlist(lapply(audit_dirs, function(dir) list.files(dir, pattern = "_widgets\\.csv$", full.names = TRUE)), use.names = FALSE)
   if (length(files) == 0L) return(empty_widget_table())
   dplyr::bind_rows(purrr::map(files, ~ readr::read_csv(.x, show_col_types = FALSE)))
@@ -205,6 +229,21 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
     dplyr::arrange(field, audit_id)
 }
 
+.field_option_differences <- function(fields) {
+  if (!"options" %in% names(fields)) return(tibble::tibble())
+  options <- dplyr::distinct(fields, audit_id, field, field_type, options, schema_group) |>
+    dplyr::mutate(options_normalized = vapply(options, option_set_to_string, character(1)))
+  variable <- options |>
+    dplyr::group_by(field, field_type) |>
+    dplyr::summarise(n_raw_option_sets = dplyr::n_distinct(options), n_option_sets = dplyr::n_distinct(options_normalized), .groups = "drop") |>
+    dplyr::filter(n_raw_option_sets > 1L)
+  if (nrow(variable) == 0L) return(tibble::tibble())
+  dplyr::inner_join(options, variable, by = c("field", "field_type")) |>
+    dplyr::mutate(severity = ifelse(n_option_sets > 1L, "WARNING", "INFO")) |>
+    dplyr::select(field, field_type, audit_id, schema_group, options_raw = options, options_normalized, severity) |>
+    dplyr::arrange(field, audit_id)
+}
+
 .field_order_differences <- function(fields) {
   variable <- fields |>
     dplyr::group_by(field) |>
@@ -227,6 +266,7 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
     only_b <- setdiff(b$field, a$field)
     type_diff <- sum(a$field_type[match(common, a$field)] != b$field_type[match(common, b$field)], na.rm = TRUE)
     state_diff <- sum(a$states_normalized[match(common, a$field)] != b$states_normalized[match(common, b$field)], na.rm = TRUE)
+    option_diff <- if ("options" %in% names(a) && "options" %in% names(b)) sum(vapply(common, function(field) !identical(option_set_to_string(a$options[a$field == field]), option_set_to_string(b$options[b$field == field])), logical(1))) else 0L
     order_diff <- sum(a$field_index[match(common, a$field)] != b$field_index[match(common, b$field)], na.rm = TRUE)
     tibble::tibble(
       audit_a = pair[[1L]], audit_b = pair[[2L]],
@@ -235,6 +275,7 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
       common_fields = length(common), fields_only_a = collapse_values(only_a),
       fields_only_b = collapse_values(only_b), field_type_differences = type_diff,
       state_set_differences = state_diff, field_order_differences = order_diff,
+      option_set_differences = option_diff,
       field_name_jaccard = length(common) / length(union(a$field, b$field))
     )
   })
@@ -287,7 +328,7 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
   if (length(candidates) == 0L) tibble::tibble() else dplyr::distinct(dplyr::bind_rows(candidates))
 }
 
-.write_diagnostics <- function(result, out_dir) {
+.write_diagnostics <- function(result, out_dir, form_label = "HPAI BCAP") {
   diagnostics_dir <- fs::path(out_dir, "diagnostics")
   dir.create(diagnostics_dir, recursive = TRUE, showWarnings = FALSE)
   write_csv_utf8(result$summary, fs::path(diagnostics_dir, "schema_summary.csv"))
@@ -296,27 +337,29 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
   write_csv_utf8(result$field_presence_differences, fs::path(diagnostics_dir, "field_presence_differences.csv"))
   write_csv_utf8(result$field_type_differences, fs::path(diagnostics_dir, "field_type_differences.csv"))
   write_csv_utf8(result$field_state_differences, fs::path(diagnostics_dir, "field_state_differences.csv"))
+  write_csv_utf8(result$field_option_differences, fs::path(diagnostics_dir, "field_option_differences.csv"))
   write_csv_utf8(result$field_order_differences, fs::path(diagnostics_dir, "field_order_differences.csv"))
   write_csv_utf8(result$widget_differences, fs::path(diagnostics_dir, "widget_encoding_differences.csv"))
-  .write_diagnostic_markdown(result, fs::path(diagnostics_dir, "schema_diagnostics.md"))
+  .write_diagnostic_markdown(result, fs::path(diagnostics_dir, "schema_diagnostics.md"), form_label = form_label)
 }
 
-.write_diagnostic_markdown <- function(result, path) {
+.write_diagnostic_markdown <- function(result, path, form_label = "HPAI BCAP") {
   counts <- schema_difference_counts(result)
   lines <- c(
-    "# HPAI PDF Schema Diagnostics", "", "## Summary", "",
+    paste0("# ", form_label, " PDF Schema Diagnostics"), "", "## Summary", "",
     paste0("- PDFs examined: ", nrow(result$summary)),
     paste0("- Successfully extracted: ", nrow(result$summary)),
     paste0("- Normalized schemas: ", counts$schemas),
     paste0("- Field-presence differences: ", counts$presence),
     paste0("- Field-type differences: ", counts$types),
     paste0("- State-set differences: ", counts$states),
-    paste0("- Field-order differences: ", counts$order), "", "## Schema groups", ""
+    paste0("- Field-order differences: ", counts$order),
+    paste0("- Choice-option differences: ", counts$options), "", "## Schema groups", ""
   )
   for (i in seq_len(nrow(result$schema_groups))) {
     group <- result$schema_groups[i, ]
     lines <- c(lines, paste0("### ", group$schema_group), "",
-      paste0("Audits: ", group$audit_ids), "",
+      paste0(if ("form_ids" %in% names(group)) "Forms: " else "Audits: ", if ("form_ids" %in% names(group)) group$form_ids else group$audit_ids), "",
       paste0("Logical fields: ", group$number_of_fields), "")
   }
   lines <- c(lines, "## Potentially consequential differences", "")
@@ -329,7 +372,8 @@ diagnose_hpai <- function(out_dir, write = TRUE, quiet = FALSE) {
     }
     for (i in seq_len(nrow(result$field_state_differences))) {
       row <- result$field_state_differences[i, ]
-      lines <- c(lines, paste0("### ", row$field), "", paste0("Normalized state set: ", row$states_normalized), "", paste0("Observed raw states: ", row$states_raw, " (", row$audit_id, ")"), "")
+      record_id <- if ("audit_id" %in% names(row)) row$audit_id else row$form_id
+      lines <- c(lines, paste0("### ", row$field), "", paste0("Normalized state set: ", row$states_normalized), "", paste0("Observed raw states: ", row$states_raw, " (", record_id, ")"), "")
     }
   }
   if (nrow(result$widget_differences) > 0L) {

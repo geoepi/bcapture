@@ -40,6 +40,11 @@ result <- extract_hpai(
   in_dir = "completed_audits",
   out_dir = "bcapture_output"
 )
+
+epi_result <- extract_epi(
+  in_dir = "completed_epi_interviews",
+  out_dir = "epi_output"
+)
 ```
 
 The current extractor reads interactive PDF form fields directly. It does not
@@ -67,6 +72,16 @@ field, raw and normalized values, provenance, page and field order, available
 button states, and `is_populated`. `/Off` remains `Off` in the master table but
 is not populated. See `docs/output-structure.md` for the complete contract.
 
+## Initial Epi Interview extraction
+
+Initial Epi extraction is separate from BCAP audit extraction and targets the
+`HPAI Response / Initial Epidemiological (Epi) Interview` May 28, 2024
+template family. It preserves raw AcroForm values, defaults, choice options,
+button states, and multi-select flags; it does not yet recode responses or
+collate repeated questionnaire tables. Use `diagnose_epi("epi_output")` for
+the Epi schema diagnostics. Other APHIS/HPAI PDF forms are not implied to be
+supported.
+
 ## Schema diagnostics
 
 Batch extraction runs normalized schema diagnostics by default. To inspect an
@@ -90,8 +105,8 @@ type. Flattened or scanned forms are recorded as `no_acroform_fields`.
 
 ## Current limitations
 
-OCR, handwriting recognition, BCAP semantic recoding, audit scoring, summaries,
-dashboards, and report generation are not implemented yet.
+OCR, handwriting recognition, semantic recoding, Epi collation, audit scoring,
+summaries, dashboards, and report generation are not implemented yet.
 
 ## Development roadmap
 
