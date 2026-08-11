@@ -6,7 +6,13 @@ utils::globalVariables(c(
   "schema_group", "source_file", "source_relpath", "states_normalized",
   "options", "options_normalized", "n_option_sets", "n_raw_option_sets",
   "number_of_choice_fields", "number_of_multiselect_fields", "severity",
-  "form_id", "alternative_name", "states", "default_value", "is_multiselect"
+  "form_id", "alternative_name", "states", "default_value", "is_multiselect",
+  "raw_field", "canonical_name", "table_name", "row_index", "column_name",
+  "source_sha256", "source_sha256_metadata", "source_page", "section_id", "section_name",
+  "question_id", "subquestion_id", "field_role", "response_type", "raw_value", "value",
+  "response_code", "response_label", "units", "n_rows", "status", "mapping_count",
+  "mapped", "unknown_field_names", "raw_fields", "mapped_fields", "unknown_fields",
+  "populated_fields", "populated_mapped_fields", "populated_unmapped_fields"
 ))
 
 schema_hash_from_fields <- function(fields) {
