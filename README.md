@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/bcapture_sticker.png" width="350" alt="hex sticker">
+  <img src="images/bcapture_hex.png" width="350" alt="hex sticker">
 </p>
   
     
