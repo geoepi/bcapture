@@ -9,6 +9,7 @@ extract_hpai(
   out_dir,
   recursive = FALSE,
   overwrite = FALSE,
+  diagnostics = TRUE,
   quiet = FALSE
 )
 }
@@ -20,6 +21,9 @@ extract_hpai(
 \item{recursive}{Search for PDFs below \code{in_dir} when \code{TRUE}.}
 
 \item{overwrite}{Replace output directories corresponding to this input batch.}
+
+\item{diagnostics}{Automatically compare successful PDF schemas and write
+diagnostic products.}
 
 \item{quiet}{Suppress progress messages.}
 }

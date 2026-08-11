@@ -49,3 +49,5 @@ rsconnect/
 local/
 output/
 data-private/
+__pycache__/
+*.py[cod]

@@ -63,6 +63,20 @@ field, raw and normalized values, provenance, page and field order, available
 button states, and `is_populated`. `/Off` remains `Off` in the master table but
 is not populated. See `docs/output-structure.md` for the complete contract.
 
+## Schema diagnostics
+
+Batch extraction runs normalized schema diagnostics by default. To inspect an
+existing extraction directory directly:
+
+```r
+diagnostics <- diagnose_hpai("bcapture_output")
+```
+
+Diagnostic products appear under `bcapture_output/diagnostics/`. They separate
+logical-field presence, field-type, response-state, field-order, and widget
+encoding differences. PDF widget serialization can vary even when forms look
+identical, so no automatic semantic reconciliation is performed.
+
 ## Failure handling
 
 Batch extraction performs preflight checks for input files, sanitized audit-ID

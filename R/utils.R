@@ -37,6 +37,16 @@ empty_field_table <- function() {
   )
 }
 
+empty_widget_table <- function() {
+  tibble::tibble(
+    page = integer(), widget_index = integer(), field_name = character(),
+    full_field_name = character(), parent_field_name = character(),
+    field_type = character(), rect_x1 = double(), rect_y1 = double(),
+    rect_x2 = double(), rect_y2 = double(), appearance_state = character(),
+    value = character(), parent_value = character(), states = character()
+  )
+}
+
 field_rows_to_tibble <- function(rows) {
   if (length(rows) == 0L) return(empty_field_table())
   purrr::map_dfr(rows, function(row) {
@@ -53,6 +63,37 @@ field_rows_to_tibble <- function(rows) {
     )
   })
 }
+
+widget_rows_to_tibble <- function(rows) {
+  if (length(rows) == 0L) return(empty_widget_table())
+  purrr::map_dfr(rows, function(row) {
+    tibble::tibble(
+      page = as.integer(row$page %||% NA_integer_),
+      widget_index = as.integer(row$widget_index %||% NA_integer_),
+      field_name = as_optional_character(row$field_name %||% NA_character_),
+      full_field_name = as_optional_character(row$full_field_name %||% NA_character_),
+      parent_field_name = as_optional_character(row$parent_field_name %||% NA_character_),
+      field_type = as_optional_character(row$field_type %||% NA_character_),
+      rect_x1 = as.numeric(row$rect_x1 %||% NA_real_),
+      rect_y1 = as.numeric(row$rect_y1 %||% NA_real_),
+      rect_x2 = as.numeric(row$rect_x2 %||% NA_real_),
+      rect_y2 = as.numeric(row$rect_y2 %||% NA_real_),
+      appearance_state = as_optional_character(row$appearance_state %||% NA_character_),
+      value = as_optional_character(row$value %||% NA_character_),
+      parent_value = as_optional_character(row$parent_value %||% NA_character_),
+      states = as_optional_character(row$states %||% NA_character_)
+    )
+  })
+}
+
+normalize_state_set <- function(states) {
+  if (length(states) == 0L || is.na(states[[1L]]) || !nzchar(states[[1L]])) return(character())
+  values <- unlist(strsplit(as.character(states[[1L]]), "\\|", fixed = FALSE), use.names = FALSE)
+  values <- sub("^/", "", trimws(values))
+  sort(unique(values[nzchar(values)]))
+}
+
+state_set_to_string <- function(states) paste(normalize_state_set(states), collapse = "|")
 
 as_single_row_tibble <- function(values) {
   values <- values[!vapply(values, is.function, logical(1))]

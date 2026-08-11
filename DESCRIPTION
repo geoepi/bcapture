@@ -1,5 +1,6 @@
 Package: bcapture
 Type: Package
+Depends: R (>= 4.1.0)
 Title: Capture and Organize Biosecurity Compliance Audit Data
 Version: 0.0.0.9000
 Authors@R: person("JM Humphreys", email = "jmh09r@my.fsu.edu", role = c("aut", "cre"))
