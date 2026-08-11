@@ -1,0 +1,30 @@
+test_that("union row binding preserves fields from different schemas", {
+  x <- tibble::tibble(audit_id = "a", field_a = "one")
+  y <- tibble::tibble(audit_id = "b", field_b = "two")
+  combined <- bcapture:::bind_union_rows(list(x, y))
+  expect_true(all(c("field_a", "field_b") %in% names(combined)))
+  expect_equal(nrow(combined), 2L)
+})
+
+test_that("schema hashes are stable and definition-sensitive", {
+  available <- tryCatch(suppressWarnings(reticulate::py_module_available("pypdf")), error = function(e) FALSE)
+  skip_if_not(available, "Python/pypdf unavailable")
+  module <- tryCatch(bcapture:::ensure_hpai_python(), error = function(e) NULL)
+  skip_if(is.null(module), "Python/pypdf unavailable")
+  a <- module$schema_hash(list(list(field = "a", field_type = "Tx", states = NULL)))
+  b <- module$schema_hash(list(list(field = "a", field_type = "Tx", states = NULL)))
+  c <- module$schema_hash(list(list(field = "a", field_type = "Btn", states = "Yes|Off")))
+  expect_identical(as.character(a), as.character(b))
+  expect_false(identical(as.character(a), as.character(c)))
+})
+
+test_that("batch failure isolation is represented in the manifest", {
+  input <- tempfile("bcapture-batch-")
+  out <- tempfile("bcapture-out-")
+  dir.create(input)
+  writeBin(charToRaw("not a PDF"), file.path(input, "bad.pdf"))
+  expect_warning(manifest <- extract_hpai(input, out, quiet = TRUE), "")
+  expect_equal(manifest$status, "failed")
+  expect_equal(manifest$failure_type, "pdf_read_error")
+  expect_true(file.exists(file.path(out, "extraction_manifest.csv")))
+})

@@ -1,0 +1,7 @@
+---
+title: "bcapture"
+output: github_document
+---
+
+This source file is retained for future README generation. The current
+README is maintained as a concise package overview.

@@ -1,0 +1,5 @@
+^\.github$
+^README\.Rmd$
+^bcapture\.Rproj$
+^docs/output-structure\.md$
+^LICENSE\.md$

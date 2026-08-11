@@ -1,0 +1,28 @@
+name: R-CMD-check
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+
+jobs:
+  R-CMD-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::devtools, any::rcmdcheck
+          needs: check
+      - uses: r-lib/actions/setup-python@v2
+        with:
+          python-version: "3.x"
+      - name: Install pypdf for integration tests
+        run: python -m pip install pypdf
+      - name: Document
+        run: Rscript -e 'devtools::document()'
+      - name: Test
+        run: Rscript -e 'devtools::test()'
+      - name: Check
+        run: Rscript -e 'devtools::check(error_on = "warning")'

@@ -39,11 +39,13 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-# pkgdown site
-docs/
-
 # translation temp files
 po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# bcapture local/private data and generated outputs
+local/
+output/
+data-private/
