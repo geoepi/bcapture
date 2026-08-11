@@ -110,7 +110,7 @@ extract_hpai <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, 
   audit_id <- sanitize_audit_id(fs::path_ext_remove(source_file))
   source_md5 <- source_checksum(pdf_file)
   extracted_at <- utc_now()
-  base_manifest <- list(audit_id = audit_id, source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, status = "failed", failure_type = NA_character_, error = NA_character_, number_of_pages = NA_integer_, number_of_fields = NA_integer_, number_of_widgets = NA_integer_, number_of_populated_fields = NA_integer_, form_schema_hash = NA_character_, schema_group = NA_character_, extraction_method = "acroform", pypdf_version = NA_character_, extracted_at_utc = extracted_at)
+  base_manifest <- list(audit_id = audit_id, form_type = "bcap", source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, status = "failed", failure_type = NA_character_, error = NA_character_, number_of_pages = NA_integer_, number_of_fields = NA_integer_, number_of_widgets = NA_integer_, number_of_populated_fields = NA_integer_, form_schema_hash = NA_character_, schema_group = NA_character_, extraction_method = "acroform", pypdf_version = NA_character_, extracted_at_utc = extracted_at)
   tryCatch({
     module <- ensure_hpai_python()
     parsed <- reticulate::py_to_r(module$extract_form(pdf_file))
@@ -120,7 +120,7 @@ extract_hpai <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, 
     widgets <- widget_rows_to_tibble(parsed$widgets)
     widgets <- dplyr::mutate(widgets, audit_id = audit_id, source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, .before = 1)
     populated <- fields[fields$is_populated, , drop = FALSE]
-    metadata_values <- c(list(audit_id = audit_id, source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, number_of_pages = as.integer(parsed$number_of_pages), number_of_fields = nrow(fields), number_of_widgets = nrow(widgets), number_of_populated_fields = nrow(populated), form_schema_hash = as_optional_character(parsed$form_schema_hash), schema_group = NA_character_, extraction_method = "acroform", pypdf_version = hpai_python_version(module), extracted_at_utc = extracted_at), parsed$pdf_metadata %||% list())
+    metadata_values <- c(list(audit_id = audit_id, form_type = "bcap", source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, number_of_pages = as.integer(parsed$number_of_pages), number_of_fields = nrow(fields), number_of_widgets = nrow(widgets), number_of_populated_fields = nrow(populated), form_schema_hash = as_optional_character(parsed$form_schema_hash), schema_group = NA_character_, extraction_method = "acroform", pypdf_version = hpai_python_version(module), extracted_at_utc = extracted_at), parsed$pdf_metadata %||% list())
     metadata <- as_single_row_tibble(metadata_values)
     wide_values <- c(list(audit_id = audit_id, source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, form_schema_hash = as_optional_character(parsed$form_schema_hash)), stats::setNames(as.list(fields$value), fields$field))
     wide <- as_single_row_tibble(wide_values)
