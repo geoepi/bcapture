@@ -1,0 +1,10 @@
+^\.github$
+^\.git$
+^\.Rproj\.user$
+^README\.Rmd$
+^bcapture\.Rproj$
+^docs/output-structure\.md$
+^LICENSE\.md$
+^scripts$
+__pycache__
+\.py[cod]$

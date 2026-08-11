@@ -1,0 +1,30 @@
+Package: bcapture
+Type: Package
+Depends: R (>= 4.1.0)
+Title: Capture and Organize Biosecurity Compliance Audit Data
+Version: 0.0.0.9000
+Authors@R: person("JM Humphreys", email = "jmh09r@my.fsu.edu", role = c("aut", "cre"))
+Author: JM Humphreys [aut, cre]
+Maintainer: JM Humphreys <jmh09r@my.fsu.edu>
+Description: Extracts structured data from Biosecurity Compliance Audit Program
+    PDF forms and provides infrastructure for organizing, validating,
+    summarizing, and eventually viewing audit results. The current extractor
+    supports electronically completed HPAI forms with interactive AcroForm
+    fields; scanned and handwritten forms are not supported yet.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports:
+    cli,
+    dplyr,
+    fs,
+    purrr,
+    readr,
+    reticulate,
+    tibble
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
