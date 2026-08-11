@@ -1,8 +1,12 @@
-# bcapture
-# bcapture
+<p align="center">
+  <img src="images/bcapture_sticker.png" width="350" alt="hex sticker">
+</p>
+  
+    
+# bCAPture
 
 `bcapture` provides tools for extracting, organizing, validating, summarizing,
-and viewing data from Biosecurity Compliance Audit Program (BCAP) forms.
+and viewing data from Biosecurity Compliance Audit Program (bCAP) forms.
 
 The current development version focuses on structured extraction from
 electronically completed HPAI BCAP PDF forms. See the package documentation
