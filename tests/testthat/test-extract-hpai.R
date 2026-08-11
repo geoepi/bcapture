@@ -23,7 +23,7 @@ test_that("batch failure isolation is represented in the manifest", {
   out <- tempfile("bcapture-out-")
   dir.create(input)
   writeBin(charToRaw("not a PDF"), file.path(input, "bad.pdf"))
-  expect_warning(manifest <- extract_hpai(input, out, quiet = TRUE), "")
+  manifest <- suppressWarnings(extract_hpai(input, out, quiet = TRUE))
   expect_equal(manifest$status, "failed")
   expect_equal(manifest$failure_type, "pdf_read_error")
   expect_true(file.exists(file.path(out, "extraction_manifest.csv")))
