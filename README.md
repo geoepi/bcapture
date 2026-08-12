@@ -49,7 +49,16 @@ epi_result <- extract_epi(
 epi <- collate_epi(
   out_dir = "epi_output"
 )
+
+validation <- validate_epi(
+  out_dir = "epi_output"
+)
 ```
+
+The Initial Epi workflow is layered: PDF extraction produces raw AcroForm
+data, collation produces semantic relational data, and `validate_epi()` produces
+reviewable data-quality findings. Validation identifies potential problems; it
+does not repair or reinterpret respondent or interviewer entries.
 
 The current extractor reads interactive PDF form fields directly. It does not
 use OCR and does not yet extract handwritten values from scanned forms.
@@ -109,9 +118,10 @@ type. Flattened or scanned forms are recorded as `no_acroform_fields`.
 
 ## Current limitations
 
-OCR, handwriting recognition, audit scoring, summaries, dashboards, and report
-generation are not implemented. The Initial Epi dictionary describes the
-questionnaire and its encodings; it does not infer biological meaning or risk.
+OCR, handwriting recognition, audit scoring, analytical summaries, and
+dashboards are not implemented. The Initial Epi dictionary describes the
+questionnaire and its encodings; extraction, collation, and data-quality
+validation do not infer biological meaning or risk.
 
 ## Development roadmap
 
