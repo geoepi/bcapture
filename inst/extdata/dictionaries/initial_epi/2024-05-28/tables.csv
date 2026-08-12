@@ -1,0 +1,12 @@
+table_name,section_id,source_question,description,expected_rows
+ai_tests,B,AI test records,"Three repeated AI test records: date, result, test type.",3
+houses,B,Sick-poultry houses,Seven possible house records.,7
+mortality_disposal,C,Mortality-disposal methods,"Fixed method rows for composting, burial, incineration, rendering, landfill, and other.",6
+manure_destinations,C,Manure/litter destinations,Three potential destination records.,3
+imported_materials,C,Imported animal/material records,Four potential product/species records.,4
+worker_visits,C,Premises/processor worker visits,Four repeated worker or processor records.,4
+crews,C,Crew visits,Four repeated crew records.,4
+visitors,C,Visitor records,Eighteen fixed visitor-category rows.,18
+shared_equipment,C,Shared equipment,Fifteen fixed equipment-category rows.,15
+bird_movements,C,Bird movements,Five onto and five off-premises bird movement records.,10
+egg_movements,C,Egg and egg-product movements,Four rows for each direction/material group.,16

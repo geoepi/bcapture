@@ -16,8 +16,8 @@ and [the output contract](docs/output-structure.md) for details.
 
 The package establishes a stable extraction layer for the broader BCAP audit
 workflow: extraction, collation, validation, summarization, and reporting.
-Only the first layer is implemented here, preserving source PDF field
-semantics for later versioned field dictionaries.
+Initial Epi extraction and its first versioned semantic collation layer are
+implemented; later analysis layers remain separate.
 
 ## Installation
 
@@ -43,6 +43,10 @@ result <- extract_hpai(
 
 epi_result <- extract_epi(
   in_dir = "completed_epi_interviews",
+  out_dir = "epi_output"
+)
+
+epi <- collate_epi(
   out_dir = "epi_output"
 )
 ```
@@ -76,11 +80,11 @@ is not populated. See `docs/output-structure.md` for the complete contract.
 
 Initial Epi extraction is separate from BCAP audit extraction and targets the
 `HPAI Response / Initial Epidemiological (Epi) Interview` May 28, 2024
-template family. It preserves raw AcroForm values, defaults, choice options,
-button states, and multi-select flags; it does not yet recode responses or
-collate repeated questionnaire tables. Use `diagnose_epi("epi_output")` for
-the Epi schema diagnostics. Other APHIS/HPAI PDF forms are not implied to be
-supported.
+template. It preserves raw AcroForm values, defaults, choice options, button
+states, and multi-select flags. `collate_epi("epi_output")` applies the
+versioned 2024-05-28 semantic dictionary and writes analysis-ready scalar and
+repeated relational tables. Use `diagnose_epi("epi_output")` for Epi schema
+diagnostics. Other APHIS/HPAI PDF forms are not implied to be supported.
 
 ## Schema diagnostics
 
@@ -105,11 +109,11 @@ type. Flattened or scanned forms are recorded as `no_acroform_fields`.
 
 ## Current limitations
 
-OCR, handwriting recognition, semantic recoding, Epi collation, audit scoring,
-summaries, dashboards, and report generation are not implemented yet.
+OCR, handwriting recognition, audit scoring, summaries, dashboards, and report
+generation are not implemented. The Initial Epi dictionary describes the
+questionnaire and its encodings; it does not infer biological meaning or risk.
 
 ## Development roadmap
 
 Future layers will add `collate_hpai()`, `validate_hpai()`,
-`summarize_hpai()`, and `view_hpai()`. The next step is a versioned BCAP field
-dictionary that maps raw PDF fields to their semantic meaning.
+`summarize_hpai()`, and `view_hpai()`.

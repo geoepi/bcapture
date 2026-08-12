@@ -380,8 +380,14 @@ diagnose_acroform_batch <- function(out_dir, id_col = "audit_id", form_label = "
     lines <- c(lines, "A possible alternate multi-widget button encoding was detected involving:", "")
     lines <- c(lines, paste0("- ", unique(c(result$widget_differences$field, result$widget_differences$companion_field)), collapse = "\n"), "")
   }
-  lines <- c(lines,
-    "No automatic semantic reconciliation was performed.", "", "## Informational differences", "",
-    "Field ordering differs across PDFs. Field order does not contribute to the normalized form schema hash.")
+  lines <- c(lines, "No automatic semantic reconciliation was performed.", "", "## Informational differences", "")
+  if (nrow(result$summary) == 1L) {
+    lines <- c(lines, "Field-order comparison is not applicable to a single-form extraction.")
+  } else if (counts$order == 0L) {
+    lines <- c(lines, "No field-order differences were detected.")
+  } else {
+    lines <- c(lines, "Field ordering differs across PDFs.")
+  }
+  lines <- c(lines, "Field order does not contribute to the normalized form schema hash.")
   writeLines(lines, path, useBytes = TRUE)
 }

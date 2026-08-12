@@ -1,0 +1,28 @@
+codebook_id,raw_code,response_label,response_order
+yes_no_1_3,1,Yes,1
+yes_no_1_3,3,No,2
+yes_no_dk_1_3_4,1,Yes,1
+yes_no_dk_1_3_4,3,No,2
+yes_no_dk_1_3_4,4,Don't know,3
+yes_no_na_dk_1_3_na_4,1,Yes,1
+yes_no_na_dk_1_3_na_4,3,No,2
+yes_no_na_dk_1_3_na_4,na,Not applicable,3
+yes_no_na_dk_1_3_na_4,4,Don't know,4
+abundance_1_5,1,None,1
+abundance_1_5,2,Tens,2
+abundance_1_5,3,Hundreds,3
+abundance_1_5,4,Thousands,4
+abundance_1_5,5,Don't Know,5
+frequency_1_3,1,Often,1
+frequency_1_3,2,Sometimes,2
+frequency_1_3,3,Never,3
+received_loaned_1_3,1,Received,1
+received_loaned_1_3,3,Loaned,2
+egg_description_1_2_3,1,Intended for hatching,1
+egg_description_1_2_3,2,Nest run,2
+egg_description_1_2_3,3,Cleaned and sanitized,3
+egg_product_status_1_2,1,Pasteurized,1
+egg_product_status_1_2,2,Not pasteurized,2
+manure_type_1_2_3,1,Fresh,1
+manure_type_1_2_3,2,Composted,2
+manure_type_1_2_3,3,Heat-treated,3
