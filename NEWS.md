@@ -1,5 +1,10 @@
 # bcapture 0.0.0.9000
 
+* Hardened Initial Epi batch collation and validation: fixed explicit
+  two-digit-year parsing, refined scalar-date versus date-expression semantics,
+  scoped conditional child-table evidence by form and declared filters, and
+  restored dictionary-defined repeated-row field/page provenance.
+
 * Added `validate_epi()` for version-aware Initial Epi data-quality and
   logical-consistency checks, including parse diagnostics, chronology,
   conditional responses, codebooks, and repeated-table validation.
