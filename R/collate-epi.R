@@ -230,8 +230,13 @@ validate_epi_table_types <- function(table_name, table, dictionary) {
   })
 }
 
-.epi_table_record <- function(mapped, form_id, table_name, row_index, dictionary) {
+.epi_table_record <- function(mapped, form_id, table_name, row_index, dictionary, row_label = NA_character_, material_type = NA_character_) {
   cell <- mapped[mapped$form_id == form_id & mapped$table_name == table_name & as.character(mapped$row_index) == as.character(row_index), , drop = FALSE]
+  if (!is.na(row_label) && nzchar(row_label)) cell <- cell[as.character(cell$row_label) == as.character(row_label), , drop = FALSE]
+  if (identical(table_name, "egg_movements") && !is.na(material_type) && nzchar(material_type)) {
+    is_eggs <- grepl("^p01(82|83|84|85|92|93|94|95)", cell$raw_field)
+    cell <- cell[if (identical(material_type, "eggs")) is_eggs else !is_eggs, , drop = FALSE]
+  }
   if (nrow(cell) == 0L || !any(cell$populated %in% TRUE)) return(NULL)
   row <- list(
     form_id = form_id, form_version = "2024-05-28", dictionary_version = "1", dictionary_hash = dictionary$dictionary_hash,
@@ -280,10 +285,20 @@ validate_epi_table_types <- function(table_name, table, dictionary) {
   for (table_name in dictionary$tables$table_name) {
     records <- list()
     table_fields <- dictionary$fields[dictionary$fields$table_name == table_name, , drop = FALSE]
-    row_indices <- sort(unique(as.integer(table_fields$row_index)))
+    groups <- unique(table_fields[c("row_index", "row_label")])
+    if (table_name == "egg_movements") {
+      groups$material_type <- ifelse(vapply(seq_len(nrow(groups)), function(i) {
+        fields <- table_fields[as.integer(table_fields$row_index) == as.integer(groups$row_index[[i]]) &
+          as.character(table_fields$row_label) == as.character(groups$row_label[[i]]), , drop = FALSE]
+        any(grepl("^p01(82|83|84|85|92|93|94|95)", fields$raw_field))
+      }, logical(1)), "eggs", "egg_products")
+    } else {
+      groups$material_type <- NA_character_
+    }
     for (form_id in form_ids) {
-      for (row_index in row_indices) {
-        record <- .epi_table_record(mapped, form_id, table_name, row_index, dictionary)
+      for (group_index in seq_len(nrow(groups))) {
+        record <- .epi_table_record(mapped, form_id, table_name, groups$row_index[[group_index]], dictionary,
+          row_label = groups$row_label[[group_index]], material_type = groups$material_type[[group_index]])
         if (!is.null(record)) {
           records[[length(records) + 1L]] <- record
         }

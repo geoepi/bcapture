@@ -1,5 +1,9 @@
 # bcapture 0.0.0.9000
 
+* Added `validate_epi()` for version-aware Initial Epi data-quality and
+  logical-consistency checks, including parse diagnostics, chronology,
+  conditional responses, codebooks, and repeated-table validation.
+
 * Added the versioned 2024-05-28 Initial Epi semantic dictionary and
   `collate_epi()`, including explicit codebooks, multiselect normalization,
   repeated relational tables, provenance, coverage artifacts, and strict
