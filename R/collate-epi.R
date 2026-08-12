@@ -59,6 +59,119 @@
   as.numeric(trimws(value))
 }
 
+.epi_parse_date_vector <- function(values) {
+  parsed <- rep(as.Date(NA), length(values))
+  for (i in seq_along(values)) parsed[[i]] <- .epi_parse_date(values[[i]])
+  parsed
+}
+
+.epi_parse_numeric_vector <- function(values) {
+  parsed <- rep(NA_real_, length(values))
+  for (i in seq_along(values)) parsed[[i]] <- .epi_parse_numeric(values[[i]])
+  parsed
+}
+
+.epi_table_column_metadata <- function(table_name, dictionary) {
+  fields <- dictionary$fields[dictionary$fields$table_name == table_name, , drop = FALSE]
+  columns <- unique(fields$column_name[!is.na(fields$column_name) & nzchar(fields$column_name)])
+  purrr::map_dfr(columns, function(column) {
+    current <- fields[fields$column_name == column, , drop = FALSE]
+    types <- unique(as.character(current$data_type[!is.na(current$data_type) & nzchar(current$data_type)]))
+    if (length(types) > 1L) stop("Initial Epi dictionary has incompatible data types for ", table_name, ".", column, call. = FALSE)
+    tibble::tibble(
+      column_name = column,
+      data_type = if (length(types) == 0L) "character" else types[[1L]],
+      has_code = any((!is.na(current$codebook_id) & nzchar(current$codebook_id)) | current$response_type %in% c("coded", "choice"))
+    )
+  })
+}
+
+.epi_table_type_contract <- function(table_name, dictionary) {
+  fixed <- c(
+    form_id = "character", form_version = "character", dictionary_version = "character",
+    dictionary_hash = "character", row_index = "integer", row_label = "character",
+    raw_fields = "character", source_pages = "character"
+  )
+  if (table_name %in% c("bird_movements", "egg_movements")) fixed <- c(fixed, direction = "character")
+  if (table_name == "egg_movements") fixed <- c(fixed, material_type = "character")
+  if (table_name == "mortality_disposal") fixed <- c(fixed, method = "character")
+  metadata <- .epi_table_column_metadata(table_name, dictionary)
+  cell_types <- unlist(purrr::map(metadata$column_name, function(column) {
+    type <- metadata$data_type[metadata$column_name == column][[1L]]
+    semantic_type <- if (identical(type, "date")) "Date" else if (identical(type, "numeric")) "double" else "character"
+    values <- c(stats::setNames("character", paste0(column, "_raw")), stats::setNames(semantic_type, column))
+    if (isTRUE(metadata$has_code[metadata$column_name == column][[1L]])) values <- c(values, stats::setNames("character", paste0(column, "_code")))
+    values
+  }), use.names = TRUE)
+  c(fixed, cell_types)
+}
+
+validate_epi_table_types <- function(table_name, table, dictionary) {
+  expected <- .epi_table_type_contract(table_name, dictionary)
+  actual <- vapply(names(expected), function(column) {
+    value <- table[[column]]
+    if (inherits(value, "Date")) "Date" else if (is.integer(value)) "integer" else if (is.double(value)) "double" else if (is.logical(value)) "logical" else if (is.character(value)) "character" else paste(class(value), collapse = "/")
+  }, character(1))
+  mismatch <- names(expected)[actual != unname(expected)]
+  if (length(mismatch) > 0L) {
+    details <- paste0(table_name, ": ", mismatch, " expected ", unname(expected[mismatch]), " actual ", actual[mismatch])
+    stop("Epi relational table type validation failed: ", paste(details, collapse = "; "), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+.epi_empty_parse_diagnostics <- function() {
+  tibble::tibble(
+    form_id = character(), raw_field = character(), canonical_name = character(),
+    table_name = character(), row_index = integer(), parse_type = character(), status = character()
+  )
+}
+
+.epi_cast_repeated_table <- function(records, table_name, dictionary) {
+  diagnostics <- .epi_empty_parse_diagnostics()
+  metadata <- .epi_table_column_metadata(table_name, dictionary)
+  for (i in seq_len(nrow(metadata))) {
+    column <- metadata$column_name[[i]]
+    raw_column <- paste0(column, "_raw")
+    raw_field_column <- paste0(column, "_raw_field")
+    if (!raw_column %in% names(records)) records[[raw_column]] <- rep(NA_character_, nrow(records))
+    if (!column %in% names(records)) records[[column]] <- rep(NA_character_, nrow(records))
+    if (!raw_field_column %in% names(records)) records[[raw_field_column]] <- rep(NA_character_, nrow(records))
+    if (isTRUE(metadata$has_code[[i]]) && !paste0(column, "_code") %in% names(records)) records[[paste0(column, "_code")]] <- rep(NA_character_, nrow(records))
+  }
+  for (i in seq_len(nrow(metadata))) {
+    column <- metadata$column_name[[i]]
+    data_type <- metadata$data_type[[i]]
+    raw_column <- paste0(column, "_raw")
+    raw_values <- as.character(records[[raw_column]])
+    if (identical(data_type, "date")) {
+      parsed <- .epi_parse_date_vector(raw_values)
+      bad <- which(!is.na(raw_values) & nzchar(trimws(raw_values)) & is.na(parsed))
+      if (length(bad) > 0L) diagnostics <- dplyr::bind_rows(diagnostics, tibble::tibble(
+        form_id = as.character(records$form_id[bad]), raw_field = as.character(records[[paste0(column, "_raw_field")]][bad]),
+        canonical_name = as.character(dictionary$fields$canonical_name[match(records[[paste0(column, "_raw_field")]][bad], dictionary$fields$raw_field)]),
+        table_name = table_name, row_index = as.integer(records$row_index[bad]), parse_type = "date", status = "failed"
+      ))
+      records[[column]] <- parsed
+    } else if (identical(data_type, "numeric")) {
+      parsed <- .epi_parse_numeric_vector(raw_values)
+      bad <- which(!is.na(raw_values) & nzchar(trimws(raw_values)) & is.na(parsed))
+      if (length(bad) > 0L) diagnostics <- dplyr::bind_rows(diagnostics, tibble::tibble(
+        form_id = as.character(records$form_id[bad]), raw_field = as.character(records[[paste0(column, "_raw_field")]][bad]),
+        canonical_name = as.character(dictionary$fields$canonical_name[match(records[[paste0(column, "_raw_field")]][bad], dictionary$fields$raw_field)]),
+        table_name = table_name, row_index = as.integer(records$row_index[bad]), parse_type = "numeric", status = "failed"
+      ))
+      records[[column]] <- parsed
+    } else {
+      records[[column]] <- as.character(records[[column]])
+    }
+  }
+  internal_columns <- grep("_raw_field$", names(records), value = TRUE)
+  if (length(internal_columns) > 0L) records[internal_columns] <- NULL
+  validate_epi_table_types(table_name, records, dictionary)
+  list(data = records, diagnostics = diagnostics)
+}
+
 .epi_join_dictionary <- function(fields, dictionary) {
   if (!"field" %in% names(fields)) stop("`combined/epi_fields_long.csv` must contain a `field` column.", call. = FALSE)
   fields$raw_field <- as.character(fields$field)
@@ -132,8 +245,6 @@
   }
   if (table_name == "mortality_disposal") row$method <- .epi_first_nonmissing(cell$row_label)
   columns <- unique(cell$column_name[!is.na(cell$column_name) & nzchar(cell$column_name)])
-  date_failures <- 0L
-  numeric_failures <- 0L
   for (column in columns) {
     candidates <- cell[cell$column_name == column, , drop = FALSE]
     selected <- candidates[which(candidates$populated %in% TRUE)[1L], , drop = FALSE]
@@ -147,39 +258,25 @@
       match <- dictionary$codes[dictionary$codes$codebook_id == codebook & as.character(dictionary$codes$raw_code) == code, , drop = FALSE]
       if (nrow(match) > 0L) label <- as.character(match$response_label[[1L]])
     }
-    row[[paste0(column, "_raw")]] <- raw
-    data_type <- selected$data_type[[1L]] %||% "character"
-    if (is.na(data_type)) data_type <- "character"
-    if (identical(data_type, "date")) {
-      parsed <- .epi_parse_date(normalized)
-      row[[column]] <- parsed
-      if (!is.na(normalized) && nzchar(normalized) && is.na(parsed)) date_failures <- date_failures + 1L
-    } else if (identical(data_type, "numeric")) {
-      parsed <- .epi_parse_numeric(normalized)
-      row[[column]] <- parsed
-      if (!is.na(normalized) && nzchar(normalized) && is.na(parsed)) numeric_failures <- numeric_failures + 1L
-    } else {
-      row[[column]] <- label
-    }
-    if (!is.na(code) && nzchar(code)) row[[paste0(column, "_code")]] <- code
+    row[[paste0(column, "_raw")]] <- as.character(raw)
+    row[[column]] <- as.character(label)
+    row[[paste0(column, "_raw_field")]] <- as.character(selected$raw_field[[1L]])
+    has_code <- selected$response_type[[1L]] %in% c("coded", "choice") || (!is.na(codebook) && nzchar(codebook))
+    if (has_code) row[[paste0(column, "_code")]] <- as.character(code)
   }
-  list(row = tibble::as_tibble(row), date_failures = date_failures, numeric_failures = numeric_failures)
+  tibble::as_tibble(row)
 }
 
 .epi_empty_table <- function(table_name, dictionary) {
-  table_fields <- dictionary$fields[dictionary$fields$table_name == table_name, , drop = FALSE]
-  columns <- unique(table_fields$column_name[!is.na(table_fields$column_name) & nzchar(table_fields$column_name)])
-  fixed <- c("form_id", "form_version", "dictionary_version", "dictionary_hash", "row_index", "row_label", "raw_fields", "source_pages")
-  if (table_name %in% c("bird_movements", "egg_movements")) fixed <- c(fixed, "direction")
-  if (table_name == "egg_movements") fixed <- c(fixed, "material_type")
-  if (table_name == "mortality_disposal") fixed <- c(fixed, "method")
-  columns <- unique(c(fixed, as.vector(rbind(paste0(columns, "_raw"), columns))))
-  tibble::as_tibble(stats::setNames(lapply(columns, function(...) character()), columns))
+  contract <- .epi_table_type_contract(table_name, dictionary)
+  tibble::as_tibble(stats::setNames(lapply(unname(contract), function(type) {
+    switch(type, Date = as.Date(character()), double = double(), integer = integer(), logical = logical(), character())
+  }), names(contract)))
 }
 
 .epi_collate_tables <- function(mapped, dictionary, form_ids) {
   outputs <- list()
-  parse_counts <- list(date = 0L, numeric = 0L)
+  diagnostics <- .epi_empty_parse_diagnostics()
   for (table_name in dictionary$tables$table_name) {
     records <- list()
     table_fields <- dictionary$fields[dictionary$fields$table_name == table_name, , drop = FALSE]
@@ -188,15 +285,22 @@
       for (row_index in row_indices) {
         record <- .epi_table_record(mapped, form_id, table_name, row_index, dictionary)
         if (!is.null(record)) {
-          records[[length(records) + 1L]] <- record$row
-          parse_counts$date <- parse_counts$date + record$date_failures
-          parse_counts$numeric <- parse_counts$numeric + record$numeric_failures
+          records[[length(records) + 1L]] <- record
         }
       }
     }
-    outputs[[table_name]] <- if (length(records) == 0L) .epi_empty_table(table_name, dictionary) else dplyr::bind_rows(records)
+    if (length(records) == 0L) {
+      outputs[[table_name]] <- .epi_empty_table(table_name, dictionary)
+      validate_epi_table_types(table_name, outputs[[table_name]], dictionary)
+    } else {
+      cast <- .epi_cast_repeated_table(dplyr::bind_rows(records), table_name, dictionary)
+      outputs[[table_name]] <- cast$data
+      diagnostics <- dplyr::bind_rows(diagnostics, cast$diagnostics)
+    }
   }
-  list(outputs = outputs, parse_counts = parse_counts)
+  list(outputs = outputs, diagnostics = diagnostics, parse_counts = list(
+    date = sum(diagnostics$parse_type == "date"), numeric = sum(diagnostics$parse_type == "numeric")
+  ))
 }
 
 #' Collate raw Initial Epi extraction products into semantic relational data
@@ -287,7 +391,7 @@ collate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict = 
     imported_materials = table_result$outputs$imported_materials, worker_visits = table_result$outputs$worker_visits,
     crews = table_result$outputs$crews, visitors = table_result$outputs$visitors, shared_equipment = table_result$outputs$shared_equipment,
     bird_movements = table_result$outputs$bird_movements, egg_movements = table_result$outputs$egg_movements,
-    coverage = coverage, manifest = collation_manifest
+    coverage = coverage, manifest = collation_manifest, parse_diagnostics = table_result$diagnostics
   )
   if (isTRUE(write)) {
     collated_dir <- fs::path(out_dir, "collated")
@@ -299,6 +403,7 @@ collate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict = 
     write_csv_utf8(coverage, fs::path(collated_dir, "dictionary_coverage.csv"))
     write_csv_utf8(collation_manifest, fs::path(collated_dir, "collation_manifest.csv"))
     write_csv_utf8(table_counts, fs::path(collated_dir, "collation_table_counts.csv"))
+    write_csv_utf8(result$parse_diagnostics, fs::path(collated_dir, "collation_parse_diagnostics.csv"))
     writeLines(diagnostics, fs::path(collated_dir, "collation_diagnostics.md"), useBytes = TRUE)
   }
   if (!isTRUE(quiet)) cli::cli_inform("Collated {length(forms_ids)} Initial Epi form{?s}.")

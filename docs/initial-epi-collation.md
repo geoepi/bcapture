@@ -33,7 +33,10 @@ Each output includes dictionary provenance. Date and numeric relational fields
 retain a `*_raw` column and are parsed only when the dictionary declares the
 type. Supported date formats are the printed `mm/dd/yyyy` and `mm/dd/yy`
 formats. Failed parsing yields `NA` in the parsed column and a diagnostic
-count; the original text is retained.
+count in `collation_parse_diagnostics.csv`; the original text is retained.
+Relational type contracts are checked before outputs are written: raw values,
+codes, labels, and identifiers are character; dates are `Date`; numeric
+measurements are double; and row indices are integer.
 
 ## Strictness and provenance
 

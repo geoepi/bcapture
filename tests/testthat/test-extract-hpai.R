@@ -82,6 +82,52 @@ test_that("diagnostic discovery excludes populated derivatives", {
   expect_equal(diagnostic$summary$number_of_fields, 1L)
 })
 
+test_that("single-form diagnostics do not claim a field-order comparison", {
+  out <- tempfile("bcapture-single-diagnostic-")
+  dir.create(file.path(out, "combined"), recursive = TRUE)
+  fields <- tibble::tibble(
+    audit_id = "pdf1", source_file = "pdf1.pdf", source_relpath = "pdf1.pdf", source_md5 = "a",
+    field_index = 1:2, page = 1L, field = c("field1", "field2"), alternative_name = NA_character_,
+    field_type = c("Tx", "Btn"), value_raw = NA_character_, value = NA_character_, states = c(NA, "Yes|No"),
+    is_populated = FALSE, extraction_method = "acroform"
+  )
+  metadata <- tibble::tibble(
+    audit_id = "pdf1", source_file = "pdf1.pdf", source_relpath = "pdf1.pdf", source_md5 = "a",
+    number_of_pages = 1L, number_of_fields = 2L, number_of_widgets = 2L,
+    number_of_populated_fields = 0L, form_schema_hash = "hash_a", schema_group = "schema_001"
+  )
+  readr::write_csv(fields, file.path(out, "combined", "hpai_fields_long.csv"))
+  readr::write_csv(metadata, file.path(out, "combined", "hpai_metadata.csv"))
+  diagnostic <- diagnose_hpai(out, quiet = TRUE)
+  report <- paste(readLines(file.path(out, "diagnostics", "schema_diagnostics.md")), collapse = "\n")
+  expect_equal(nrow(diagnostic$summary), 1L)
+  expect_true(grepl("Field-order comparison is not applicable to a single-form extraction\\.", report))
+  expect_false(grepl("Field ordering differs across PDFs\\.", report))
+})
+
+test_that("identical multi-form diagnostics report no order differences", {
+  out <- tempfile("bcapture-identical-diagnostic-")
+  dir.create(file.path(out, "combined"), recursive = TRUE)
+  fields <- dplyr::bind_rows(lapply(c("pdf1", "pdf2"), function(id) tibble::tibble(
+    audit_id = id, source_file = paste0(id, ".pdf"), source_relpath = paste0(id, ".pdf"), source_md5 = id,
+    field_index = 1:2, page = 1L, field = c("field1", "field2"), alternative_name = NA_character_,
+    field_type = c("Tx", "Btn"), value_raw = NA_character_, value = NA_character_, states = c(NA, "Yes|No"),
+    is_populated = FALSE, extraction_method = "acroform"
+  )))
+  metadata <- tibble::tibble(
+    audit_id = c("pdf1", "pdf2"), source_file = c("pdf1.pdf", "pdf2.pdf"), source_relpath = c("pdf1.pdf", "pdf2.pdf"), source_md5 = c("a", "b"),
+    number_of_pages = c(1L, 1L), number_of_fields = c(2L, 2L), number_of_widgets = c(2L, 2L),
+    number_of_populated_fields = c(0L, 0L), form_schema_hash = c("hash_a", "hash_a"), schema_group = c("schema_001", "schema_001")
+  )
+  readr::write_csv(fields, file.path(out, "combined", "hpai_fields_long.csv"))
+  readr::write_csv(metadata, file.path(out, "combined", "hpai_metadata.csv"))
+  diagnostic <- diagnose_hpai(out, quiet = TRUE)
+  report <- paste(readLines(file.path(out, "diagnostics", "schema_diagnostics.md")), collapse = "\n")
+  expect_equal(nrow(diagnostic$field_order_differences), 0L)
+  expect_true(grepl("No field-order differences were detected\\.", report))
+  expect_false(grepl("Field ordering differs across PDFs\\.", report))
+})
+
 test_that("state and field ordering are normalized for schema hashing", {
   expect_equal(bcapture:::normalize_state_set("Yes|No"), c("No", "Yes"))
   expect_equal(bcapture:::normalize_state_set("Off|Yes"), c("Off", "Yes"))

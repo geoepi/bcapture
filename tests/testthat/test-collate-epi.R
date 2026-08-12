@@ -119,3 +119,62 @@ test_that("strict and non-strict modes report unknown fields", {
   expect_equal(result$manifest$populated_unmapped_fields, 1)
   expect_true(any(result$coverage$raw_field == "p9999" & !result$coverage$mapped))
 })
+
+test_that("repeated-table dates remain Date across valid, blank, and invalid rows", {
+  dictionary <- bcapture:::load_epi_dictionary()
+  contract <- bcapture:::.epi_table_type_contract("ai_tests", dictionary)
+  records <- tibble::as_tibble(stats::setNames(lapply(unname(contract), function(type) {
+    if (identical(type, "integer")) integer(3) else character(3)
+  }), names(contract)))
+  records$form_id <- rep("synthetic", 3)
+  records$row_index <- 1:3
+  records$date_raw <- c("01/10/2025", "", "bad date")
+  records$date <- NA_character_
+  records$date_raw_field <- c("p0007a", "p0008a", "p0009a")
+  cast <- bcapture:::.epi_cast_repeated_table(records, "ai_tests", dictionary)
+  expect_s3_class(cast$data$date, "Date")
+  expect_equal(cast$data$date, as.Date(c("2025-01-10", NA, NA)))
+  expect_equal(nrow(cast$diagnostics), 1L)
+  expect_equal(cast$diagnostics$raw_field, "p0009a")
+})
+
+test_that("repeated-table numerics remain double across valid, blank, and invalid rows", {
+  dictionary <- bcapture:::load_epi_dictionary()
+  contract <- bcapture:::.epi_table_type_contract("houses", dictionary)
+  records <- tibble::as_tibble(stats::setNames(lapply(unname(contract), function(type) {
+    if (identical(type, "integer")) integer(3) else character(3)
+  }), names(contract)))
+  records$form_id <- rep("synthetic", 3)
+  records$row_index <- 1:3
+  records$birds_today_raw <- c("15", "", "malformed")
+  records$birds_today <- NA_character_
+  records$birds_today_raw_field <- c("p00010c", "p00011c", "p00012c")
+  cast <- bcapture:::.epi_cast_repeated_table(records, "houses", dictionary)
+  expect_true(is.double(cast$data$birds_today))
+  expect_equal(cast$data$birds_today, c(15, NA_real_, NA_real_))
+  expect_equal(nrow(cast$diagnostics), 1L)
+  expect_equal(cast$diagnostics$parse_type, "numeric")
+})
+
+test_that("all date-bearing repeated tables use a stable Date column", {
+  dictionary <- bcapture:::load_epi_dictionary()
+  date_columns <- c(
+    ai_tests = "date", houses = "clinical_onset_date", mortality_disposal = "dates", manure_destinations = "date",
+    imported_materials = "date", worker_visits = "date", crews = "date", visitors = "visit_dates",
+    shared_equipment = "date_last_on_site", bird_movements = "date", egg_movements = "date"
+  )
+  for (table_name in names(date_columns)) {
+    contract <- bcapture:::.epi_table_type_contract(table_name, dictionary)
+    records <- tibble::as_tibble(stats::setNames(lapply(unname(contract), function(type) {
+      if (identical(type, "integer")) 1L else character(1)
+    }), names(contract)))
+    column <- date_columns[[table_name]]
+    raw_field <- dictionary$fields$raw_field[dictionary$fields$table_name == table_name & dictionary$fields$column_name == column][[1L]]
+    records[[paste0(column, "_raw")]] <- "bad date"
+    records[[column]] <- NA_character_
+    records[[paste0(column, "_raw_field")]] <- raw_field
+    cast <- bcapture:::.epi_cast_repeated_table(records, table_name, dictionary)
+    expect_true(inherits(cast$data[[column]], "Date"), info = table_name)
+    expect_equal(nrow(cast$diagnostics), 1L, info = table_name)
+  }
+})
