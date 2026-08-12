@@ -1,0 +1,26 @@
+schema_version: 1
+
+project_id: hpai-plume
+subproject_id: bcapture
+
+title: Extraction and visualization Tools for Biosecurity Compliance Audit Program
+summary: >
+  bcapture provides tools for extracting, organizing, validating, summarizing, and viewing data from Biosecurity Compliance Audit Program (bCAP) forms.
+
+lead:
+  name: John Humphreys
+  github: JMHumphreys
+
+status: active
+current_focus: Implementing summary statistics and targeted validation.
+
+repository:
+  canonical: geoepi/bcapture
+  upstream: null
+
+compute:
+  - Atlas
+
+next_milestone:
+  description: Plot figures
+  target: 2026-10-01
