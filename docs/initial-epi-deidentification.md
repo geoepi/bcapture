@@ -1,5 +1,8 @@
 # Initial Epi de-identification
 
+For a user-facing walkthrough of the controlled-use privacy workflow, see the
+[Initial Epi de-identification tutorial](tutorials/initial-epi-deidentification.md).
+
 `deidentify_epi()` is the privacy boundary between identifiable collated
 Initial Epi data and controlled-use analytical data:
 

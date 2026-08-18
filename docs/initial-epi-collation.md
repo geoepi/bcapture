@@ -1,5 +1,8 @@
 # Initial Epi semantic collation
 
+For a user-facing walkthrough of extraction through semantic collation, see
+the [Initial Epi workflow tutorial](tutorials/initial-epi-workflow.md).
+
 `extract_epi()` is the loss-minimizing raw extraction layer. It writes every
 AcroForm field to `combined/epi_fields_long.csv`, including blank fields,
 raw PDF values, normalized display values, form IDs, source files, and schema
