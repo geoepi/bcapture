@@ -290,3 +290,20 @@ epi_batch_out/collated/
 Keep the source workflow and de-identified analytical workflow as separate
 artifacts. For technical policy and audit details, see the
 [de-identification contract](../initial-epi-deidentification.md).
+
+## Next: summarize the de-identified dataset
+
+Once the de-identification output has passed its privacy review and validation
+is available, create controlled-use descriptive products:
+
+    summary <- summarize_epi(
+      deidentified_dir = epi_deid_out
+    )
+
+    summary$overview
+    summary$scalar_frequencies
+    summary$numeric_summaries
+
+summarize_epi() reads only epi_deid_out. It does not read or require the
+private crosswalk. See the [Initial Epi summary documentation](../initial-epi-summaries.md)
+for denominator definitions, validation handling, and output products.
