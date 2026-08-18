@@ -41,6 +41,17 @@
   identical(path, parent) || startsWith(path, paste0(parent, "/"))
 }
 
+.epi_deid_has_output_ancestor <- function(path) {
+  current <- dirname(path)
+  repeat {
+    marker <- fs::path(current, "privacy", "deidentification_manifest.csv")
+    if (file.exists(marker)) return(TRUE)
+    parent <- dirname(current)
+    if (identical(parent, current)) return(FALSE)
+    current <- parent
+  }
+}
+
 .epi_deid_git_root <- function(path) {
   current <- path
   repeat {
@@ -63,6 +74,9 @@
   if (.epi_deid_path_is_within(cross_abs, deid_abs) || .epi_deid_path_is_within(cross_abs, out_abs) ||
       .epi_deid_path_is_within(deid_abs, cross_abs)) {
     stop("The crosswalk and de-identified output must be physically separate and not nested.", call. = FALSE)
+  }
+  if (.epi_deid_has_output_ancestor(cross_abs)) {
+    stop("The crosswalk must not be stored inside an existing de-identified output tree.", call. = FALSE)
   }
   git_root <- .epi_deid_git_root(cross_abs)
   if (!is.na(git_root)) {
@@ -662,6 +676,6 @@ deidentify_epi <- function(out_dir, deidentified_dir, crosswalk_dir, version = "
   if (dir.exists(paths$deidentified_dir) && isTRUE(overwrite)) unlink(paths$deidentified_dir, recursive = TRUE, force = TRUE)
   if (!file.rename(temp_dir, paths$deidentified_dir)) stop("Unable to finalize the de-identified output directory.", call. = FALSE)
   on.exit(NULL, add = TRUE)
-  if (!isTRUE(quiet)) cli::cli_inform("De-identified {nrow(records)} Initial Epi form{?s}; privacy audit {manifest$status[[1L]}.")
+  if (!isTRUE(quiet)) cli::cli_inform("De-identified {nrow(records)} Initial Epi form{?s}; privacy audit {manifest$status[[1L]]}.")
   list(status = manifest$status[[1L]], forms_processed = nrow(records), deidentified_dir = paths$deidentified_dir, manifest = manifest, audit = audit)
 }

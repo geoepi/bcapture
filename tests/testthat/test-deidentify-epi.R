@@ -67,7 +67,10 @@ test_that("deidentify_epi protects direct identifiers and preserves analytical t
   deid_dir <- tempfile("epi-deid-output-")
   crosswalk_dir <- tempfile("epi-deid-crosswalk-")
   source_forms <- readr::read_csv(file.path(source_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)
-  result <- bcapture::deidentify_epi(source_dir, deid_dir, crosswalk_dir, quiet = TRUE)
+  expect_message(
+    result <- bcapture::deidentify_epi(source_dir, deid_dir, crosswalk_dir),
+    "privacy audit passed"
+  )
   expect_equal(result$status, "passed")
   expect_false(any(c("record_crosswalk", "entity_crosswalk", "crosswalk") %in% names(result)))
   output_forms <- readr::read_csv(file.path(deid_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)
@@ -127,6 +130,13 @@ test_that("path safety rejects nested and version-controlled crosswalks", {
   source_dir <- tempfile("epi-deid-path-source-"); dir.create(source_dir, recursive = TRUE)
   deid_dir <- tempfile("epi-deid-path-output-")
   expect_error(bcapture::deidentify_epi(source_dir, deid_dir, file.path(deid_dir, "crosswalk")), "physically separate")
+  existing_output <- tempfile("epi-deid-existing-output-")
+  dir.create(file.path(existing_output, "privacy"), recursive = TRUE)
+  file.create(file.path(existing_output, "privacy", "deidentification_manifest.csv"))
+  expect_error(
+    bcapture::deidentify_epi(source_dir, deid_dir, file.path(existing_output, "crosswalk")),
+    "existing de-identified output"
+  )
   git_crosswalk <- file.path(getwd(), "private-crosswalk-test")
   if (is.na(bcapture:::.epi_deid_git_root(normalizePath(git_crosswalk, winslash = "/", mustWork = FALSE)))) skip("Git worktree is not present in the installed package check copy")
   expect_error(bcapture::deidentify_epi(source_dir, deid_dir, git_crosswalk), "Git working tree")
