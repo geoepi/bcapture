@@ -47,7 +47,8 @@
   premcnty = "Example County", ownname = owner, ownph = "555-222-3333", owneml = "owner@example.org",
   premlat = "30.123", premlong = "-84.123", p0004 = "Owner Person is mentioned in notes.",
   p0001 = "05/28/2024", p00010a = "House 1", p00010c = "100", p00010e = "10", p00010g = "05/20/2024",
-  p00010h = "House 1 onset", p0133b = "Visitor Company / 555-222-3333", p0179oth = "Example Company Crew"
+  p00010h = "House 1 onset", p0133b = "Visitor Company / 555-222-3333", p0179oth = "Example Company Crew",
+  weename = "Interviewer Person"
 )
 
 test_that("the analysis privacy policy covers every logical field", {
@@ -87,6 +88,7 @@ test_that("deidentify_epi protects direct identifiers and preserves analytical t
   expect_true(inherits(output_houses$clinical_onset_date, "Date"))
   expect_equal(output_houses$clinical_onset_location, "LOCATION-000001")
   expect_equal(output_forms$company_crew_name, "ORG-000001")
+  expect_equal(output_forms$interviewee_name, "PERSON-000001")
   expect_true(any(output_responses$raw_field == "p0004" & is.na(output_responses$raw_value)))
   expect_true(any(output_responses$raw_field == "premname" & grepl("^PREMISES-", output_responses$value)))
   expect_false(any(output_responses$raw_value == "Owner Person", na.rm = TRUE))
