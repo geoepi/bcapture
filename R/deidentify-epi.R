@@ -144,6 +144,10 @@
     is_eggs <- grepl("^p01(82|83|84|85|92|93|94|95)", fields$raw_field)
     fields <- fields[if (identical(as.character(row$material_type[[1L]]), "eggs")) is_eggs else !is_eggs, , drop = FALSE]
   }
+  if (nrow(fields) == 0L) {
+    fields <- fields_data[!is.na(fields_data$table_name) & fields_data$table_name == table_name &
+      !is.na(fields_data$column_name) & as.character(fields_data$column_name) == column, , drop = FALSE]
+  }
   if (nrow(fields) == 0L && "raw_fields" %in% names(row) && !is.na(row$raw_fields[[1L]])) {
     candidates <- unlist(strsplit(as.character(row$raw_fields[[1L]]), "|", fixed = TRUE), use.names = FALSE)
     fields <- dictionary$fields[!is.na(dictionary$fields$column_name) & dictionary$fields$raw_field %in% candidates & dictionary$fields$column_name == column, , drop = FALSE]
@@ -225,10 +229,12 @@
   sprintf("%s-%06d", prefix, .epi_deid_case_prefix(prefix, existing) + 1L)
 }
 
-.epi_deid_add_sensitive <- function(state, value) {
+.epi_deid_add_sensitive <- function(state, value, scope = NULL) {
   value <- as.character(value)
   value <- value[!is.na(value) & nzchar(trimws(value))]
-  if (length(value) > 0L) state$sensitive_values <- unique(c(state$sensitive_values, value))
+  if (length(value) == 0L) return(invisible(NULL))
+  if (is.null(scope)) state$sensitive_values <- unique(c(state$sensitive_values, value)) else state$sensitive_context[[scope]] <- unique(c(state$sensitive_context[[scope]], value))
+  invisible(NULL)
 }
 
 .epi_deid_event <- function(state, table_name, column_name, rule, value, output, case_id, raw_field) {
@@ -282,7 +288,7 @@
     }
     output <- .epi_deid_entity(state, value, as.character(rule$pseudonym_class[[1L]]), case_id, raw_field, table_name)
   } else stop("Privacy policy action is not implemented.", call. = FALSE)
-  if (action != "retain") .epi_deid_add_sensitive(state, value)
+  if (action != "retain") .epi_deid_add_sensitive(state, value, paste(table_name, column_name, sep = "\r"))
   if (isTRUE(record_event)) .epi_deid_event(state, table_name, column_name, rule, value, output, case_id, raw_field)
   output
 }
@@ -369,7 +375,7 @@
     }
     if (column %in% c("premises_id", "premises_name")) {
       for (i in seq_len(nrow(forms))) {
-        .epi_deid_add_sensitive(state, forms[[column]][[i]])
+        .epi_deid_add_sensitive(state, forms[[column]][[i]], paste("epi_forms", column, sep = "\r"))
         forms[[column]][[i]] <- .epi_deid_premises_value(forms[[column]][[i]], records, forms$case_id[[i]])
       }
     } else {
@@ -382,18 +388,22 @@
 .epi_deid_transform_responses <- function(responses, records, rules, state) {
   responses <- .epi_deid_case_join(responses, records)
   .epi_deid_assert_columns(responses, c("case_id", .epi_deid_allowed_metadata, "raw_value", "value", "date_value", "numeric_value", "response_code", "response_label", "is_populated"), "epi_responses_long")
+  if (!"date_value" %in% names(responses)) responses$date_value <- as.Date(rep(NA_character_, nrow(responses)))
+  if (!"numeric_value" %in% names(responses)) responses$numeric_value <- rep(NA_real_, nrow(responses))
   for (i in seq_len(nrow(responses))) {
     rule <- .epi_deid_rule(rules, responses$raw_field[[i]])
     if (is.null(rule)) stop("Privacy policy is missing a semantic long-table field rule.", call. = FALSE)
     raw <- responses$raw_value[[i]]
     if (identical(as.character(rule$pseudonym_class[[1L]]), "premises")) {
-      .epi_deid_add_sensitive(state, raw)
+      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "raw_value", sep = "\r"))
       transformed <- .epi_deid_premises_value(raw, records, responses$case_id[[i]])
     } else transformed <- .epi_deid_transform(state, raw, rule, responses$case_id[[i]], "epi_responses_long", "raw_value", responses$raw_field[[i]])
     responses$raw_value[[i]] <- transformed
     responses$value[[i]] <- if (identical(as.character(rule$action[[1L]]), "retain")) responses$value[[i]] else transformed
     if (!identical(as.character(rule$action[[1L]]), "retain")) {
       responses$response_label[[i]] <- transformed
+      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "value", sep = "\r"))
+      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "response_label", sep = "\r"))
       responses$response_code[[i]] <- NA_character_
       responses$date_value[[i]] <- as.Date(NA)
       responses$numeric_value[[i]] <- NA_real_
@@ -459,7 +469,7 @@
   TRUE
 }
 
-.epi_deid_scan <- function(outputs, sensitive_values) {
+.epi_deid_scan <- function(outputs, sensitive_values, sensitive_context = list()) {
   sensitive_values <- unique(as.character(sensitive_values[!is.na(sensitive_values) & nzchar(trimws(sensitive_values))]))
   flags <- list()
   add_flag <- function(table_name, column_name, case_id, raw_field, canonical_name, leak_type, severity) {
@@ -475,7 +485,8 @@
       values <- as.character(x[[column]])
       for (i in which(!is.na(values) & nzchar(trimws(values)))) {
         cell <- values[[i]]; normalized_cell <- tolower(trimws(gsub("[[:space:]]+", " ", cell)))
-        for (source in sensitive_values) {
+        scoped_values <- unique(c(sensitive_values, sensitive_context[[paste(table_name, column, sep = "\r")]]))
+        for (source in scoped_values) {
           normalized_source <- tolower(trimws(gsub("[[:space:]]+", " ", source)))
           numeric_source <- grepl("^[0-9+(). -]+$", normalized_source)
           hit <- if (numeric_source || nchar(normalized_source) < 8L) identical(normalized_cell, normalized_source) else identical(normalized_cell, normalized_source) || grepl(normalized_source, normalized_cell, fixed = TRUE)
@@ -604,7 +615,7 @@ deidentify_epi <- function(out_dir, deidentified_dir, crosswalk_dir, version = "
   crosswalk <- .epi_deid_load_crosswalks(paths$crosswalk_dir)
   forms <- .epi_deid_read_csv(fs::path(collated, "epi_forms.csv"), "epi_forms.csv")
   if (!"form_id" %in% names(forms)) stop("Collated scalar product is missing `form_id`.", call. = FALSE)
-  state <- new.env(parent = emptyenv()); state$strict <- isTRUE(strict); state$events <- list(); state$sensitive_values <- character(); state$entities <- crosswalk$entity; state$entity_keys <- character()
+  state <- new.env(parent = emptyenv()); state$strict <- isTRUE(strict); state$events <- list(); state$sensitive_values <- character(); state$sensitive_context <- list(); state$entities <- crosswalk$entity; state$entity_keys <- character()
   case_map <- .epi_deid_case_map(forms, crosswalk, state)
   records <- case_map$records
   .epi_deid_add_sensitive(state, records$source_sha256); .epi_deid_add_sensitive(state, records$source_file)
@@ -625,7 +636,7 @@ deidentify_epi <- function(out_dir, deidentified_dir, crosswalk_dir, version = "
     validation_files <- fs::dir_ls(fs::path(temp_dir, "validation"), regexp = "\\.csv$", type = "file")
     for (path in validation_files) safe_outputs[[paste0("validation_", fs::path_ext_remove(fs::path_file(path)))]] <- readr::read_csv(path, show_col_types = FALSE, na = c("", "NA"))
   }
-  leak_flags <- .epi_deid_scan(safe_outputs, state$sensitive_values)
+  leak_flags <- .epi_deid_scan(safe_outputs, state$sensitive_values, state$sensitive_context)
   confirmed <- sum(leak_flags$severity == "ERROR")
   warnings <- sum(leak_flags$severity == "WARNING")
   if (confirmed > 0L) stop("Privacy audit detected one or more confirmed direct-identifier leaks; no output was finalized.", call. = FALSE)
