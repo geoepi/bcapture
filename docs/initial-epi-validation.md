@@ -56,6 +56,18 @@ validation categories are `parse`, `range`, `chronology`, `conditional`,
 `table_structure`, `codebook`, and `cross_field`; severities are `INFO`,
 `WARNING`, and `ERROR`.
 
+Conditional evidence from a repeated child table is evaluated independently
+for each `form_id`. A child row from one form cannot satisfy or contradict a
+parent response on another form. When a registry rule declares `child_filter`
+metadata, the engine also applies every declared column/value subset after
+form scoping. This distinguishes, for example, movements onto versus off the
+premises and eggs versus egg products without hard-coded rule branches.
+
+Parse validation applies only to fields declared as scalar `date` or
+`numeric`. Values from `date_text` fields are preserved as temporal-expression
+text and are not warned on merely because they contain multiple dates,
+recurrence, or descriptive scheduling language.
+
 With `strict = FALSE`, all findings are returned. With `strict = TRUE`, all
 findings are still written and returned, but an `ERROR` finding emits a warning
 to signal failed strict validation. Warnings do not stop processing.

@@ -2,10 +2,23 @@
   if (!is.character(version) || length(version) != 1L || is.na(version) || !nzchar(version)) {
     stop("`version` must be a single dictionary version.", call. = FALSE)
   }
-  root <- system.file("extdata", "dictionaries", "initial_epi", version, package = "bcapture")
-  if (!nzchar(root)) {
-    root <- fs::path("inst", "extdata", "dictionaries", "initial_epi", version)
+  project_root <- normalizePath(getwd(), winslash = "/", mustWork = TRUE)
+  repeat {
+    description <- fs::path(project_root, "DESCRIPTION")
+    if (file.exists(description) && any(grepl("^Package:\\s*bcapture\\s*$", readLines(description, warn = FALSE)))) break
+    parent <- dirname(project_root)
+    if (identical(parent, project_root)) {
+      project_root <- NA_character_
+      break
+    }
+    project_root <- parent
   }
+  source_root <- if (is.na(project_root)) NA_character_ else fs::path(
+    project_root, "inst", "extdata", "dictionaries", "initial_epi", version
+  )
+  root <- if (dir.exists(source_root)) source_root else system.file(
+    "extdata", "dictionaries", "initial_epi", version, package = "bcapture"
+  )
   if (!dir.exists(root)) {
     stop("Unsupported Initial Epi dictionary version: ", version, call. = FALSE)
   }
@@ -77,6 +90,10 @@ validate_epi_dictionary <- function(dictionary = NULL, version = "2024-05-28") {
     if (any(is.na(fields$section_id) | !nzchar(fields$section_id))) problems <- c(problems, "dictionary fields missing section metadata")
     if (any(is.na(fields$question_id) | !nzchar(fields$question_id))) problems <- c(problems, "dictionary fields missing question metadata")
     if (any(is.na(fields$canonical_name) | !nzchar(fields$canonical_name))) problems <- c(problems, "dictionary fields missing canonical_name")
+    allowed_data_types <- c("character", "date", "date_text", "numeric")
+    if (any(is.na(fields$data_type) | !fields$data_type %in% allowed_data_types)) {
+      problems <- c(problems, "dictionary fields contain unsupported data_type values")
+    }
     scalar <- fields[is.na(fields$table_name) | !nzchar(fields$table_name), , drop = FALSE]
     if (anyDuplicated(scalar$canonical_name)) problems <- c(problems, "scalar canonical_name is not unique")
     table_fields <- fields[!is.na(fields$table_name) & nzchar(fields$table_name), , drop = FALSE]

@@ -45,11 +45,15 @@
 .epi_parse_date <- function(value) {
   value <- as.character(value)
   if (length(value) == 0L || is.na(value) || !nzchar(trimws(value))) return(as.Date(NA))
-  for (format in c("%m/%d/%Y", "%m/%d/%y")) {
-    parsed <- as.Date(value, format = format)
-    if (!is.na(parsed)) return(parsed)
+  value <- trimws(value)
+  format <- if (grepl("^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$", value)) {
+    "%m/%d/%Y"
+  } else if (grepl("^[0-9]{1,2}/[0-9]{1,2}/[0-9]{2}$", value)) {
+    "%m/%d/%y"
+  } else {
+    return(as.Date(NA))
   }
-  as.Date(NA)
+  as.Date(value, format = format)
 }
 
 .epi_parse_numeric <- function(value) {
@@ -203,7 +207,10 @@ validate_epi_table_types <- function(table_name, table, dictionary) {
       dictionary_hash = dictionary$dictionary_hash, section_id = row$section_id[[1L]], section_name = row$section_name[[1L]],
       question_id = row$question_id[[1L]], subquestion_id = row$subquestion_id[[1L]], raw_field = row$raw_field[[1L]],
       canonical_name = row$canonical_name[[1L]], field_role = row$field_role[[1L]], response_type = row$response_type[[1L]],
-      raw_value = raw_value, value = label, response_code = code, response_label = label, units = row$units[[1L]],
+      data_type = row$data_type[[1L]], raw_value = raw_value, value = label,
+      date_value = if (identical(row$data_type[[1L]], "date")) .epi_parse_date(normalized) else as.Date(NA),
+      numeric_value = if (identical(row$data_type[[1L]], "numeric")) .epi_parse_numeric(normalized) else NA_real_,
+      response_code = code, response_label = label, units = row$units[[1L]],
       source_page = as.integer(row$source_page[[1L]]), is_populated = row$populated[[1L]]
     )
   })
@@ -231,17 +238,32 @@ validate_epi_table_types <- function(table_name, table, dictionary) {
 }
 
 .epi_table_record <- function(mapped, form_id, table_name, row_index, dictionary, row_label = NA_character_, material_type = NA_character_) {
-  cell <- mapped[mapped$form_id == form_id & mapped$table_name == table_name & as.character(mapped$row_index) == as.character(row_index), , drop = FALSE]
-  if (!is.na(row_label) && nzchar(row_label)) cell <- cell[as.character(cell$row_label) == as.character(row_label), , drop = FALSE]
-  if (identical(table_name, "egg_movements") && !is.na(material_type) && nzchar(material_type)) {
-    is_eggs <- grepl("^p01(82|83|84|85|92|93|94|95)", cell$raw_field)
-    cell <- cell[if (identical(material_type, "eggs")) is_eggs else !is_eggs, , drop = FALSE]
+  definition <- dictionary$fields[
+    !is.na(dictionary$fields$table_name) & dictionary$fields$table_name == table_name &
+      !is.na(dictionary$fields$row_index) & as.integer(dictionary$fields$row_index) == as.integer(row_index),
+    , drop = FALSE
+  ]
+  if (!is.na(row_label) && nzchar(row_label)) {
+    definition <- definition[!is.na(definition$row_label) & as.character(definition$row_label) == as.character(row_label), , drop = FALSE]
   }
+  if (identical(table_name, "egg_movements") && !is.na(material_type) && nzchar(material_type)) {
+    is_eggs <- grepl("^p01(82|83|84|85|92|93|94|95)", definition$raw_field)
+    definition <- definition[if (identical(material_type, "eggs")) is_eggs else !is_eggs, , drop = FALSE]
+  }
+  definition <- definition[order(as.character(definition$raw_field)), , drop = FALSE]
+  cell <- mapped[
+    !is.na(mapped$form_id) & mapped$form_id == form_id &
+      !is.na(mapped$raw_field) & mapped$raw_field %in% definition$raw_field,
+    , drop = FALSE
+  ]
+  cell <- cell[match(definition$raw_field, cell$raw_field, nomatch = 0L), , drop = FALSE]
   if (nrow(cell) == 0L || !any(cell$populated %in% TRUE)) return(NULL)
+  source_pages <- sort(unique(as.integer(definition$source_page[!is.na(definition$source_page)])))
   row <- list(
     form_id = form_id, form_version = "2024-05-28", dictionary_version = "1", dictionary_hash = dictionary$dictionary_hash,
-    row_index = as.integer(row_index), row_label = .epi_first_nonmissing(cell$row_label),
-    raw_fields = paste(cell$raw_field, collapse = "|"), source_pages = paste(sort(unique(cell$source_page)), collapse = "|")
+    row_index = as.integer(row_index), row_label = .epi_first_nonmissing(definition$row_label),
+    raw_fields = paste(as.character(definition$raw_field), collapse = "|"),
+    source_pages = if (length(source_pages) == 0L) NA_character_ else paste(source_pages, collapse = "|")
   )
   if (table_name == "bird_movements") row$direction <- .epi_first_nonmissing(cell$row_label)
   if (table_name == "egg_movements") {
@@ -285,14 +307,14 @@ validate_epi_table_types <- function(table_name, table, dictionary) {
   for (table_name in dictionary$tables$table_name) {
     records <- list()
     table_fields <- dictionary$fields[dictionary$fields$table_name == table_name, , drop = FALSE]
-    groups <- unique(table_fields[c("row_index", "row_label")])
     if (table_name == "egg_movements") {
-      groups$material_type <- ifelse(vapply(seq_len(nrow(groups)), function(i) {
-        fields <- table_fields[as.integer(table_fields$row_index) == as.integer(groups$row_index[[i]]) &
-          as.character(table_fields$row_label) == as.character(groups$row_label[[i]]), , drop = FALSE]
-        any(grepl("^p01(82|83|84|85|92|93|94|95)", fields$raw_field))
-      }, logical(1)), "eggs", "egg_products")
+      table_fields$material_type <- ifelse(
+        grepl("^p01(82|83|84|85|92|93|94|95)", table_fields$raw_field),
+        "eggs", "egg_products"
+      )
+      groups <- unique(table_fields[c("row_index", "row_label", "material_type")])
     } else {
+      groups <- unique(table_fields[c("row_index", "row_label")])
       groups$material_type <- NA_character_
     }
     for (form_id in form_ids) {

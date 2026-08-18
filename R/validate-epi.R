@@ -245,7 +245,10 @@ validate_epi_conditionals <- function(products, dictionary, rules) {
       table_present <- FALSE
       if (!is.na(rule$child_table[[1L]]) && nzchar(rule$child_table[[1L]])) {
         table <- products$tables[[rule$child_table[[1L]]]]
-        if (!is.null(table) && nrow(table) > 0L) table_present <- any(.epi_validation_table_filter(table, rule$child_filter[[1L]]))
+        if (!is.null(table) && nrow(table) > 0L) {
+          table <- table[!is.na(table$form_id) & as.character(table$form_id) == form_id, , drop = FALSE]
+          table_present <- nrow(table) > 0L && any(.epi_validation_table_filter(table, rule$child_filter[[1L]]))
+        }
       }
       present <- scalar_present || table_present
       if ((triggered && !present) || (!triggered && identical(as.character(parent$response_code[[1L]]), "3") && present)) {

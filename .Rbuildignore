@@ -2,10 +2,15 @@
 ^\.git$
 ^\.git/
 ^\.gitignore$
+^\.geoepi\.yml$
 ^\.Rproj\.user$
 ^README\.Rmd$
 ^bcapture\.Rproj$
+^docs$
+^docs/
 ^docs/output-structure\.md$
+^images$
+^images/
 ^LICENSE\.md$
 ^scripts$
 ^scripts/

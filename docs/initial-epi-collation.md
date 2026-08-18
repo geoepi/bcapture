@@ -29,11 +29,29 @@ materials, worker visits, crews, visitors, shared equipment, bird movements,
 and egg movements. Blank repeated rows are omitted, while partial rows are
 retained with `form_id` and `row_index`.
 
-Each output includes dictionary provenance. Date and numeric relational fields
-retain a `*_raw` column and are parsed only when the dictionary declares the
-type. Supported date formats are the printed `mm/dd/yyyy` and `mm/dd/yy`
-formats. Failed parsing yields `NA` in the parsed column and a diagnostic
-count in `collation_parse_diagnostics.csv`; the original text is retained.
+`epi_forms.csv` is intentionally a character-valued convenience table so its
+existing wide-column contract remains stable. The canonical semantic-long
+table adds type-stable `date_value` and `numeric_value` companions. These are
+populated only for scalar fields whose dictionary `data_type` is `date` or
+`numeric`; `raw_value` and the existing character `value` are unchanged.
+
+Each relational output includes dictionary provenance. `raw_fields` lists the
+dictionary-defined raw PDF fields that contribute to the logical row in
+deterministic order, and `source_pages` contains sorted, deduplicated source
+pages. Date and numeric relational fields retain a `*_raw` column and are
+parsed only when the dictionary declares the type. Supported scalar date
+formats are explicitly `mm/dd/yyyy` and `mm/dd/yy`, including one-digit month
+or day values. A two-digit year is parsed with the two-digit-year format and is
+never first accepted as a literal year such as 0025. Failed scalar parsing
+yields a typed `NA` and a diagnostic in
+`collation_parse_diagnostics.csv`; the original text is retained.
+
+The dictionary distinguishes scalar `date` fields from `date_text`. The latter
+is used where the printed form permits date(s), multiple dates, a range,
+recurrence, or descriptive scheduling text. `date_text` values remain
+character data and are not treated as scalar-date parse failures. Collation
+does not guess dates from arbitrary prose.
+
 Relational type contracts are checked before outputs are written: raw values,
 codes, labels, and identifiers are character; dates are `Date`; numeric
 measurements are double; and row indices are integer.

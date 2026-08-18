@@ -21,6 +21,13 @@ are never interpreted globally: the `codebook_id` in `fields.csv` selects the
 meaning. `tables.csv` registers repeated structures; the individual raw-field
 mapping remains in `fields.csv`.
 
+`fields.csv` uses `date` only when the questionnaire expects one scalar
+calendar date. It uses `date_text` when the printed form permits date(s),
+multiple dates, ranges, recurrence, or other temporal expressions. The
+versioned validation registry uses `child_filter` metadata for directional or
+material subsets of repeated child tables; the validation engine applies those
+filters within the current form only.
+
 The official form states that study data are Confidential Business Information.
 This bundle contains field names, question metadata, and response vocabulary
 only. It contains no populated PDF, respondent response, premises identifier,
