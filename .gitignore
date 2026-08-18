@@ -49,5 +49,9 @@ rsconnect/
 local/
 output/
 data-private/
+crosswalks/
+private_crosswalks/
+*_record_crosswalk.csv
+*_entity_crosswalk.csv
 __pycache__/
 *.py[cod]

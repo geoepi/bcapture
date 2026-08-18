@@ -28,6 +28,15 @@ versioned validation registry uses `child_filter` metadata for directional or
 material subsets of repeated child tables; the validation engine applies those
 filters within the current form only.
 
+`deidentification_rules.csv` is the complete 497-field privacy policy for the
+controlled-use `analysis` profile. It is data-driven and versioned with this
+dictionary. It explicitly retains approved analytical values, removes direct
+contact and exact-location values, pseudonymizes identity-bearing values, and
+withholds unconstrained free text for review. This profile creates
+pseudonymized/de-identified analytical data, not irreversibly anonymous data;
+the separately stored crosswalk remains sensitive and is required for
+authorized re-identification.
+
 The official form states that study data are Confidential Business Information.
 This bundle contains field names, question metadata, and response vocabulary
 only. It contains no populated PDF, respondent response, premises identifier,

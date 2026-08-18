@@ -53,12 +53,27 @@ epi <- collate_epi(
 validation <- validate_epi(
   out_dir = "epi_output"
 )
+
+analysis <- deidentify_epi(
+  out_dir = "epi_output",
+  deidentified_dir = "epi_analysis",
+  crosswalk_dir = "D:/secure/bcapture_crosswalks/example_epi_project"
+)
 ```
 
-The Initial Epi workflow is layered: PDF extraction produces raw AcroForm
-data, collation produces semantic relational data, and `validate_epi()` produces
-reviewable data-quality findings. Validation identifies potential problems; it
-does not repair or reinterpret respondent or interviewer entries.
+The Initial Epi workflow is layered:
+
+```text
+PDF -> extract -> collate -> validate -> de-identify -> analyze
+```
+
+PDF extraction produces raw AcroForm data, collation produces semantic
+relational data, validation produces reviewable data-quality findings, and
+`deidentify_epi()` creates a separately stored pseudonymized/de-identified
+analysis dataset. The crosswalk path must be outside the project repository
+and outside the de-identified output. The analysis profile is for controlled
+use; it is not an unrestricted public-release or irreversible anonymization
+workflow.
 
 The current extractor reads interactive PDF form fields directly. It does not
 use OCR and does not yet extract handwritten values from scanned forms.

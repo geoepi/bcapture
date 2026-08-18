@@ -1,5 +1,10 @@
 # bcapture 0.0.0.9000
 
+* Added `deidentify_epi()` with a versioned Initial Epi privacy policy,
+  crosswalk-backed pseudonyms, coarse geography handling, conservative
+  free-text withholding, and an automatic privacy leak audit for controlled-use
+  pseudonymized analysis outputs.
+
 * Hardened Initial Epi batch collation and validation: fixed explicit
   two-digit-year parsing, refined scalar-date versus date-expression semantics,
   scoped conditional child-table evidence by form and declared filters, and
