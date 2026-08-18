@@ -9,19 +9,20 @@
   }
   values <- list(
     synthetic_1 = with_values(helper_env$.deid_values(), c(
-      p0019 = "1", p0314 = "na", p0005 = "1",
+      p0019 = "1", p0308 = "1", p0314 = "na", p0005 = "1",
       p0001 = "01/01/2025", p0125a = "On", p0125b = "On",
       p0133 = "1", p0133a = "01/01/2025", p0133b = "Visitor A",
       p0134 = "1", p0134a = "01/02/2025", p0134b = "Visitor B"
     )),
     synthetic_2 = with_values(
       helper_env$.deid_values(owner = "Second Owner", premises = "Second Farm"), c(
-      p0019 = "3", p0005 = "2", p0001 = "01/03/2025", p0125b = "On",
+      p0019 = "3", p0308 = "3", p0005 = "2", p0001 = "01/03/2025", p0125b = "On",
       p0133 = "1", p0133a = "01/03/2025", p0133b = "Visitor C"
     )),
     synthetic_3 = with_values(
       helper_env$.deid_values(owner = "Third Owner", premises = "Third Farm"), c(
-      p0019 = NA_character_, p0005 = "not numeric", p0001 = "Daily"
+      p0019 = NA_character_, p0308 = NA_character_, p0005 = "not numeric",
+      p0001 = "Daily"
     ))
   )
   values[[2L]]$premid <- "SYNTHETIC-PREMISES-002"
@@ -84,14 +85,14 @@ test_that("summarize_epi creates metadata-driven descriptive products", {
   ))))
 
   coded <- result$scalar_frequencies[
-    result$scalar_frequencies$canonical_name == "eggs_for_research", , drop = FALSE
+    result$scalar_frequencies$canonical_name == "closest_field_tilled_last_fall", , drop = FALSE
   ]
-  expect_equal(coded$response_label, c("Yes", "No"))
-  expect_equal(coded$n_response, c(1L, 1L))
+  expect_equal(coded$response_label, c("Yes", "No", "Don't know"))
+  expect_equal(coded$n_response, c(1L, 1L, 0L))
   expect_true(all(coded$n_answered == 2L))
   expect_true(all(coded$n_missing == 1L))
-  expect_equal(coded$percent_of_answered, c(50, 50))
-  expect_equal(coded$percent_of_all_cases, c(100 / 3, 100 / 3))
+  expect_equal(coded$percent_of_answered, c(50, 50, 0))
+  expect_equal(coded$percent_of_all_cases, c(100 / 3, 100 / 3, 0))
 
   not_applicable <- result$scalar_frequencies[
     result$scalar_frequencies$canonical_name == "supplemental_feed", , drop = FALSE
