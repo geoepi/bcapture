@@ -75,6 +75,15 @@ and outside the de-identified output. The analysis profile is for controlled
 use; it is not an unrestricted public-release or irreversible anonymization
 workflow.
 
+## Tutorials
+
+For complete synthetic user workflows, see the
+[bCAPture tutorials](docs/tutorials/README.md):
+
+- [BCAP workflow](docs/tutorials/bcap-workflow.md)
+- [Initial Epi workflow](docs/tutorials/initial-epi-workflow.md)
+- [Initial Epi de-identification](docs/tutorials/initial-epi-deidentification.md)
+
 The current extractor reads interactive PDF form fields directly. It does not
 use OCR and does not yet extract handwritten values from scanned forms.
 

@@ -1,5 +1,8 @@
 # Initial Epi data-quality validation
 
+For a user-facing walkthrough of extraction, collation, and validation, see
+the [Initial Epi workflow tutorial](tutorials/initial-epi-workflow.md).
+
 `validate_epi()` is the data-quality layer after extraction and semantic
 collation:
 

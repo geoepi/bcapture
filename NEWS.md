@@ -1,5 +1,9 @@
 # bcapture 0.0.0.9000
 
+* Added user-facing synthetic workflow tutorials for BCAP extraction and the
+  complete Initial Epi extraction, collation, validation, and de-identification
+  workflow.
+
 * Added `deidentify_epi()` with a versioned Initial Epi privacy policy,
   crosswalk-backed pseudonyms, coarse geography handling, conservative
   free-text withholding, and an automatic privacy leak audit for controlled-use

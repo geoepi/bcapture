@@ -1,5 +1,8 @@
 # Extraction output contract
 
+For a step-by-step user workflow that produces these extraction products, see
+the [BCAP workflow tutorial](tutorials/bcap-workflow.md).
+
 `extract_hpai()` writes extraction products below the requested `out_dir`:
 
 ```text
