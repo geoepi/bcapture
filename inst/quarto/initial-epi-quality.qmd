@@ -1,0 +1,178 @@
+---
+title: "Initial Epi Data Quality Review"
+author: "bcapture"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: true
+    self-contained: true
+    code-fold: false
+css: assets/epi-report.css
+execute:
+  echo: false
+  warning: false
+  message: false
+params:
+  data_file: null
+  report_title: "Initial Epi Data Quality Review"
+  generated_at: null
+---
+
+```{r}
+data <- readRDS(params$data_file)
+p <- data
+manifest <- p$summary_manifest
+overview <- p$dataset_overview
+status <- as.character(manifest$status[[1L]])
+privacy <- data$privacy
+
+table_html <- function(x) {
+  if (nrow(x) == 0L) return("No rows to display.")
+  knitr::kable(x, format = "html", escape = TRUE)
+}
+fmt <- function(x) ifelse(is.na(x) | !nzchar(as.character(x)), "-", as.character(x))
+```
+
+::: {.callout-note}
+**`r params$report_title`**
+
+This report describes validation, completeness, parsing, and analytical
+readiness for de-identified Initial Epidemiological Interview summary products
+for controlled analytical use.
+It does not contain the private re-identification crosswalk and is not
+automatically suitable for unrestricted public release.
+:::
+
+```{r, results='asis'}
+if (identical(status, "review")) {
+  cat("::: {.callout-warning}\n**Analytical status: REVIEW**\n\nReview findings remain and should be resolved or accepted before downstream use.\n:::\n")
+} else {
+  cat("::: {.callout-note}\n**Analytical status: PASSED**\n\nThe summary products passed the configured analytical gates.\n:::\n")
+}
+```
+
+## Analytical readiness
+
+The readiness values below are supplied by `summary_manifest.csv` and
+`dataset_overview.csv`; this report does not create a composite quality score.
+
+```{r, results='asis'}
+readiness <- data.frame(
+  Measure = c("Summary status", "Validation available", "Valid cases", "Review cases",
+    "Error cases", "Privacy-excluded fields", "Unsupported retained fields", "Cases"),
+  Value = c(status, fmt(manifest$validation_available[[1L]]),
+    overview$n_validation_valid[[1L]], overview$n_validation_review[[1L]],
+    overview$n_validation_error[[1L]], manifest$n_privacy_excluded_fields[[1L]],
+    manifest$n_unsupported_retained_fields[[1L]], manifest$n_cases[[1L]])
+)
+cat(table_html(readiness))
+```
+
+## Validation status
+
+```{r, results='asis'}
+validation <- p$validation_status_summary
+validation$validation_status <- factor(validation$validation_status,
+  levels = c("valid", "review", "error"))
+print(ggplot2::ggplot(validation, ggplot2::aes_string(
+  x = "validation_status", y = "n_cases", fill = "validation_status"
+)) + ggplot2::geom_col(show.legend = FALSE) +
+  ggplot2::scale_fill_manual(values = c(valid = "#3b7d5a", review = "#9a6b20", error = "#a94a4a"),
+    drop = FALSE) + ggplot2::labs(x = "Validation status", y = "Cases") +
+  ggplot2::theme_minimal(base_size = 11) +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+cat(table_html(validation))
+```
+
+## Validation findings by rule
+
+```{r, results='asis'}
+rules <- p$validation_rule_summary
+severity_order <- c("ERROR", "WARNING", "INFO")
+rules$.severity_order <- match(toupper(as.character(rules$severity)), severity_order)
+rules <- rules[order(rules$.severity_order, -as.numeric(rules$n_findings), rules$rule_id), , drop = FALSE]
+rules$.severity_order <- NULL
+cat(table_html(rules))
+```
+
+## Numeric parsing quality
+
+Parse-success percentages below are presentation-only ratios of the supplied
+`n_parsed` and `n_populated` counts; underlying counts and statistics are not
+recomputed.
+
+```{r, results='asis'}
+numeric <- p$numeric_summaries
+numeric_display <- numeric[c("section_id", "question_id", "canonical_name", "units",
+  "n_total", "n_populated", "n_parsed", "n_unparsed", "n_missing")]
+numeric_display$parse_success_percent <- ifelse(
+  numeric_display$n_populated > 0,
+  100 * numeric_display$n_parsed / numeric_display$n_populated, NA_real_)
+cat(table_html(numeric_display))
+```
+
+## Date parsing quality
+
+```{r, results='asis'}
+dates <- p$date_summaries[c("section_id", "question_id", "canonical_name",
+  "n_total", "n_populated", "n_parsed", "n_unparsed", "n_missing")]
+dates$parse_success_percent <- ifelse(
+  dates$n_populated > 0, 100 * dates$n_parsed / dates$n_populated, NA_real_)
+cat(table_html(dates))
+```
+
+## Missingness overview
+
+Missingness percentages below are presentation-only ratios of the supplied
+missing and total counts. They are descriptive displays, not quality thresholds.
+
+```{r, results='asis'}
+scalar <- p$scalar_frequencies
+scalar_missing <- scalar[!duplicated(scalar$canonical_name),
+  c("section_id", "question_id", "canonical_name", "n_cases_total", "n_answered", "n_missing")]
+names(scalar_missing)[names(scalar_missing) == "n_cases_total"] <- "n_total"
+numeric_missing <- numeric[c("section_id", "question_id", "canonical_name", "n_total", "n_missing")]
+date_missing <- dates[c("section_id", "question_id", "canonical_name", "n_total", "n_missing")]
+missingness <- dplyr::bind_rows(scalar_missing, numeric_missing, date_missing)
+missingness$missing_percent <- ifelse(missingness$n_total > 0,
+  100 * missingness$n_missing / missingness$n_total, NA_real_)
+missingness <- missingness[order(-missingness$missing_percent, missingness$canonical_name), , drop = FALSE]
+cat(table_html(missingness))
+```
+
+## Privacy review summary
+
+Only aggregate privacy metadata is included below. Review rows and tested
+strings are never staged for the report.
+
+```{r, results='asis'}
+if (nrow(privacy$manifest) > 0L) cat(table_html(privacy$manifest), "\n\n", sep = "") else
+  cat("No de-identification manifest was available.\n\n")
+cat(table_html(privacy$review), "\n\n", sep = "")
+cat(table_html(privacy$leak_audit))
+```
+
+## Repeated-table completeness
+
+```{r, results='asis'}
+tables <- p$repeated_table_summaries[c("table_name", "n_cases_total",
+  "n_cases_with_records", "n_records_total", "median_records_per_case",
+  "max_records_per_case")]
+cat(table_html(tables))
+```
+
+## Provenance
+
+```{r, results='asis'}
+provenance <- data.frame(
+  Measure = c("Form version", "Privacy profile", "Summary schema version",
+    "Summary status", "Cases", "bcapture package version", "Report generated"),
+  Value = c(as.character(manifest$form_version[[1L]]), as.character(manifest$profile[[1L]]),
+    as.character(manifest$summary_schema_version[[1L]]), as.character(status),
+    as.character(manifest$n_cases[[1L]]), as.character(manifest$package_version[[1L]]),
+    as.character(params$generated_at))
+)
+cat(table_html(provenance))
+cat("\n\n<p class='epi-caption'>Generated by bcapture from de-identified Initial Epi summary products.</p>\n")
+```

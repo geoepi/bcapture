@@ -1,0 +1,259 @@
+---
+title: "Initial Epi Descriptive Summary"
+author: "bcapture"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: true
+    self-contained: true
+    code-fold: false
+css: assets/epi-report.css
+execute:
+  echo: false
+  warning: false
+  message: false
+params:
+  data_file: null
+  report_title: "Initial Epi Descriptive Summary"
+  generated_at: null
+---
+
+```{r}
+data <- readRDS(params$data_file)
+p <- data
+overview <- p$dataset_overview
+manifest <- p$summary_manifest
+status <- as.character(manifest$status[[1L]])
+
+escape_html <- function(x) {
+  x <- ifelse(is.na(x), "", as.character(x))
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;", x, fixed = TRUE)
+  x <- gsub(">", "&gt;", x, fixed = TRUE)
+  gsub('"', "&quot;", x, fixed = TRUE)
+}
+fmt <- function(x) ifelse(is.na(x) | !nzchar(as.character(x)), "-", as.character(x))
+table_html <- function(x) {
+  if (nrow(x) == 0L) return("No rows to display.")
+  knitr::kable(x, format = "html", escape = TRUE)
+}
+section_rows <- function(...) {
+  rows <- list(...)
+  ids <- unique(unlist(lapply(rows, function(x) if (nrow(x)) as.character(x$section_id) else character())))
+  ids[!is.na(ids) & nzchar(ids)]
+}
+wrap_label <- function(x, width = 36L) {
+  vapply(x, function(value) paste(strwrap(as.character(value), width = width), collapse = "\n"), character(1))
+}
+```
+
+::: {.callout-note}
+**`r params$report_title`**
+
+This report describes de-identified Initial Epidemiological Interview data for
+controlled analytical use. It does not contain the private re-identification
+crosswalk and is not automatically suitable for unrestricted public release.
+:::
+
+```{r, results='asis'}
+if (identical(status, "review")) {
+  cat("::: {.callout-warning}\n**Analytical status: REVIEW**\n\nReview findings remain in the summary products; interpret this report accordingly.\n:::\n")
+} else {
+  cat("::: {.callout-note}\n**Analytical status: PASSED**\n\nThe summary products passed the configured analytical gates.\n:::\n")
+}
+```
+
+## Dataset overview
+
+The values below are supplied by `summarize_epi()` in `dataset_overview.csv`.
+
+```{r, results='asis'}
+overview_table <- data.frame(
+  Measure = c("Cases", "Counties represented", "Interview date range",
+              "Validation: valid cases", "Validation: review cases",
+              "Validation: error cases", "Repeated-table records"),
+  Value = c(
+    overview$n_cases[[1L]], overview$n_counties[[1L]],
+    paste(fmt(overview$first_interview_date[[1L]]), "to", fmt(overview$last_interview_date[[1L]])),
+    overview$n_validation_valid[[1L]], overview$n_validation_review[[1L]],
+    overview$n_validation_error[[1L]], overview$n_repeated_records[[1L]]
+  )
+)
+cat(table_html(overview_table))
+```
+
+## Validation status
+
+```{r, results='asis'}
+validation <- p$validation_status_summary
+validation$validation_status <- factor(validation$validation_status,
+  levels = c("valid", "review", "error"))
+print(ggplot2::ggplot(validation, ggplot2::aes_string(
+  x = "validation_status", y = "n_cases", fill = "validation_status"
+)) +
+  ggplot2::geom_col(show.legend = FALSE) +
+  ggplot2::labs(x = "Validation status", y = "Cases") +
+  ggplot2::scale_fill_manual(values = c(valid = "#3b7d5a", review = "#9a6b20", error = "#a94a4a"),
+    drop = FALSE) +
+  ggplot2::theme_minimal(base_size = 11) +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+cat("\n\n", table_html(validation), sep = "")
+```
+
+## Questionnaire summaries by section
+
+Categorical percentages and counts in this section are displayed directly from
+the scalar and multiselect summary products. Percentages use the denominator
+specified in each product.
+
+```{r, results='asis'}
+scalar <- p$scalar_frequencies
+multi <- p$multiselect_frequencies
+repeated_categorical <- p$repeated_categorical_frequencies
+sections <- section_rows(scalar, multi, repeated_categorical)
+for (section_id in sections) {
+  section_name <- c(
+    as.character(scalar$section_name[scalar$section_id == section_id]),
+    as.character(multi$section_name[multi$section_id == section_id]),
+    as.character(repeated_categorical$section_name[repeated_categorical$section_id == section_id])
+  )
+  section_name <- section_name[!is.na(section_name) & nzchar(section_name)][1L]
+  cat("### Section ", escape_html(section_id),
+      if (!is.na(section_name)) paste0(": ", escape_html(section_name)) else "", "\n\n", sep = "")
+  section_scalar <- scalar[scalar$section_id == section_id, , drop = FALSE]
+  for (question_id in unique(as.character(section_scalar$question_id))) {
+    current <- section_scalar[section_scalar$question_id == question_id, , drop = FALSE]
+    question_text <- current$question_text[[1L]]
+    cat("#### ", escape_html(question_id), ": ", escape_html(question_text), "\n\n", sep = "")
+    current$response_label <- fmt(current$response_label)
+    if (all(as.numeric(current$n_answered) == 0)) {
+      cat("No responses recorded. Missing: ", current$n_missing[[1L]],
+          " of ", current$n_cases_total[[1L]], " cases.\n\n", sep = "")
+      next
+    }
+    if (nrow(current) <= 8L) {
+      response_levels <- current$response_label[order(current$response_order,
+        seq_len(nrow(current)), na.last = TRUE)]
+      current$response_label <- factor(current$response_label,
+        levels = unique(response_levels))
+      print(ggplot2::ggplot(current, ggplot2::aes_string(
+        x = "percent_of_answered", y = "response_label"
+      )) +
+        ggplot2::geom_col(fill = "#2c6e8f") +
+        ggplot2::labs(x = "Percent of answered cases", y = NULL) +
+        ggplot2::scale_y_discrete(labels = wrap_label) +
+        ggplot2::theme_minimal(base_size = 11) +
+        ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+    } else {
+      display <- current[c("response_label", "n_response", "percent_of_answered", "n_answered", "n_missing", "n_cases_total")]
+      names(display) <- c("Response", "Responses", "Percent of answered", "Answered", "Missing", "Cases")
+      cat(table_html(display), "\n\n", sep = "")
+    }
+    cat("<p class='epi-caption'>Response categories: ",
+        paste(vapply(as.character(current$response_label), escape_html, character(1)),
+          collapse = ", "), ".</p>\n", sep = "")
+    cat("<p class='epi-caption'>Answered: ", current$n_answered[[1L]], " of ",
+        current$n_cases_total[[1L]], " cases; missing: ", current$n_missing[[1L]],
+        ". Zero-count codebook categories are retained.</p>\n", sep = "")
+  }
+  section_multi <- multi[multi$section_id == section_id, , drop = FALSE]
+  for (question_id in unique(as.character(section_multi$question_id))) {
+    current <- section_multi[section_multi$question_id == question_id, , drop = FALSE]
+    cat("#### ", escape_html(question_id), ": ", escape_html(current$question_text[[1L]]), "\n\n", sep = "")
+    current$item_label <- fmt(current$item_label)
+    current$item_label <- factor(current$item_label, levels = rev(current$item_label))
+    print(ggplot2::ggplot(current, ggplot2::aes_string(
+      x = "percent_of_all_cases", y = "item_label"
+    )) +
+      ggplot2::geom_col(fill = "#6b8e9e") +
+      ggplot2::labs(x = "Percent of all cases", y = "Selected item") +
+      ggplot2::scale_y_discrete(labels = wrap_label) +
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+    cat("<p class='epi-caption'>Cases with any selection: ",
+        current$n_cases_with_any_selection[[1L]],
+        ". Percentages within a multiselect question need not sum to 100%.</p>\n", sep = "")
+  }
+}
+```
+
+## Repeated-table overview
+
+The repeated-table products retain all registered tables, including tables with
+zero records. Categorical percentages below use records with a nonmissing
+response, not cases.
+
+```{r, results='asis'}
+tables <- p$repeated_table_summaries
+display <- tables[c("table_name", "n_cases_with_records", "n_records_total",
+                    "median_records_per_case", "max_records_per_case")]
+names(display) <- c("Table", "Cases with records", "Total records",
+                    "Median records per case", "Maximum records per case")
+cat(table_html(display), "\n\n", sep = "")
+if (nrow(repeated_categorical) > 0L) {
+  repeated_display <- repeated_categorical[c(
+    "table_name", "column_name", "response_label", "n_records_total",
+    "n_nonmissing", "n_value", "percent_of_nonmissing")]
+  names(repeated_display) <- c("Table", "Column", "Response", "Records",
+    "Nonmissing records", "Value count", "Percent of nonmissing records")
+  cat(table_html(repeated_display))
+}
+```
+
+## Numeric summaries
+
+These are descriptive summaries supplied by `numeric_summaries.csv`. The
+report does not reconstruct distributions from aggregate statistics.
+
+```{r, results='asis'}
+numeric <- p$numeric_summaries
+numeric_display <- numeric[c("section_id", "question_id", "canonical_name", "units",
+  "n_parsed", "n_unparsed", "n_missing", "mean", "sd", "median", "q25", "q75", "min", "max")]
+cat(table_html(numeric_display), "\n\n", sep = "")
+plot_data <- numeric[!is.na(numeric$median), , drop = FALSE]
+if (nrow(plot_data) > 0L) {
+  plot_data$label <- ifelse(is.na(plot_data$units) | !nzchar(plot_data$units),
+    plot_data$canonical_name, paste0(plot_data$canonical_name, " (", plot_data$units, ")"))
+  print(ggplot2::ggplot(plot_data, ggplot2::aes_string(x = "label", y = "median")) +
+    ggplot2::geom_linerange(ggplot2::aes_string(ymin = "min", ymax = "max"), colour = "#9aaab2", linewidth = 1) +
+    ggplot2::geom_errorbar(ggplot2::aes_string(ymin = "q25", ymax = "q75"), width = .2, colour = "#2c6e8f", linewidth = 2) +
+    ggplot2::geom_point(size = 2.5, colour = "#24313a") +
+    ggplot2::coord_flip() + ggplot2::labs(x = NULL, y = "Value") +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+}
+```
+
+## Date summaries
+
+Date ranges and parsing counts are displayed directly from `date_summaries.csv`.
+
+```{r, results='asis'}
+dates <- p$date_summaries[c("section_id", "question_id", "canonical_name",
+  "n_parsed", "n_unparsed", "n_missing", "min_date", "median_date", "max_date")]
+cat(table_html(dates))
+```
+
+## Notes on denominators and missingness
+
+Categorical summaries distinguish answered cases from missing cases. Explicit
+answered categories such as `Not applicable` remain response categories. Scalar
+categorical percentages use `percent_of_answered`; multiselect percentages show
+their denominator in the axis and caption; repeated categorical percentages use
+records with a nonmissing response.
+
+## Provenance
+
+```{r, results='asis'}
+provenance <- data.frame(
+  Measure = c("Form version", "Privacy profile", "Summary schema version",
+              "Summary status", "Cases", "bcapture package version", "Report generated"),
+  Value = c(as.character(manifest$form_version[[1L]]), as.character(manifest$profile[[1L]]),
+    as.character(manifest$summary_schema_version[[1L]]), as.character(status),
+    as.character(manifest$n_cases[[1L]]), as.character(manifest$package_version[[1L]]),
+    as.character(params$generated_at))
+)
+cat(table_html(provenance))
+cat("\n\n<p class='epi-caption'>Generated by bcapture from de-identified Initial Epi summary products.</p>\n")
+```
