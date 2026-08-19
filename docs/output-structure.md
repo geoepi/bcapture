@@ -102,3 +102,26 @@ them separately from semantic interpretation.
 `populated_fields_long` and `audits_wide` are convenience representations
 derived from the canonical `fields_long` output. They should not replace the
 long table for archival or future semantic collation.
+
+## Initial Epi analytical and reporting outputs
+
+After Initial Epi extraction, collation, validation, de-identification, and
+summarization, the controlled-use analytical output has this structure:
+
+```text
+deidentified_dir/
+├── collated/
+├── validation/
+├── privacy/
+├── summary/
+└── reports/
+    ├── initial_epi_summary.html
+    ├── initial_epi_quality.html
+    └── report_manifest.csv
+```
+
+`summary/` contains machine-readable products created by `summarize_epi()`.
+`reports/` contains derived human-readable HTML output created by
+`render_epi_report()`. Reports require an existing summary directory, remain
+self-contained when rendered, and do not read the private re-identification
+crosswalk or identifiable source products.
