@@ -27,9 +27,35 @@ overview <- p$dataset_overview
 status <- as.character(manifest$status[[1L]])
 privacy <- data$privacy
 
-table_html <- function(x) {
+fmt_integer <- function(x) {
+  ifelse(is.na(x), "-", format(as.integer(round(as.numeric(x))), big.mark = ",", trim = TRUE))
+}
+fmt_decimal <- function(x, digits = 1L) {
+  ifelse(is.na(x), "-", format(round(as.numeric(x), digits), nsmall = 0L,
+    trim = TRUE, scientific = FALSE))
+}
+fmt_percent <- function(x) fmt_decimal(x, 1L)
+humanize_name <- function(x) {
+  x <- gsub("_+", " ", as.character(x))
+  tools::toTitleCase(x)
+}
+question_label <- function(x) {
+  text <- if ("question_text" %in% names(x)) trimws(as.character(x$question_text)) else rep("", nrow(x))
+  fallback <- if ("canonical_name" %in% names(x)) humanize_name(x$canonical_name) else rep("", nrow(x))
+  use_text <- !is.na(text) & nzchar(text) & nchar(text) <= 80L
+  ifelse(use_text, text, fallback)
+}
+section_label <- function(x) {
+  text <- if ("section_name" %in% names(x)) trimws(as.character(x$section_name)) else rep("", nrow(x))
+  fallback <- if ("section_id" %in% names(x)) as.character(x$section_id) else rep("", nrow(x))
+  ifelse(!is.na(text) & nzchar(text), text, fallback)
+}
+table_html <- function(x, class = "epi-table") {
   if (nrow(x) == 0L) return("No rows to display.")
-  knitr::kable(x, format = "html", escape = TRUE)
+  classes <- unique(c("epi-table", strsplit(class, " +")[[1L]]))
+  html <- knitr::kable(x, format = "html", escape = TRUE,
+    table.attr = paste0('class="', paste(classes, collapse = " "), '"'))
+  paste0('<div class="epi-table-scroll">', html, "</div>")
 }
 fmt <- function(x) ifelse(is.na(x) | !nzchar(as.character(x)), "-", as.character(x))
 ```
@@ -82,7 +108,13 @@ print(ggplot2::ggplot(validation, ggplot2::aes_string(
     drop = FALSE) + ggplot2::labs(x = "Validation status", y = "Cases") +
   ggplot2::theme_minimal(base_size = 11) +
   ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
-cat(table_html(validation))
+validation_display <- data.frame(
+  Status = as.character(validation$validation_status),
+  Cases = fmt_integer(validation$n_cases),
+  `Percent of cases` = fmt_percent(validation$percent_of_cases),
+  check.names = FALSE
+)
+cat(table_html(validation_display, "epi-table-compact"))
 ```
 
 ## Validation findings by rule
@@ -93,7 +125,15 @@ severity_order <- c("ERROR", "WARNING", "INFO")
 rules$.severity_order <- match(toupper(as.character(rules$severity)), severity_order)
 rules <- rules[order(rules$.severity_order, -as.numeric(rules$n_findings), rules$rule_id), , drop = FALSE]
 rules$.severity_order <- NULL
-cat(table_html(rules))
+rules_display <- data.frame(
+  Severity = as.character(rules$severity),
+  Type = humanize_name(rules$validation_type),
+  Rule = as.character(rules$rule_id),
+  Findings = fmt_integer(rules$n_findings),
+  Cases = fmt_integer(rules$n_cases),
+  check.names = FALSE
+)
+cat(table_html(rules_display, "epi-table-compact"))
 ```
 
 ## Numeric parsing quality
@@ -104,22 +144,35 @@ recomputed.
 
 ```{r, results='asis'}
 numeric <- p$numeric_summaries
-numeric_display <- numeric[c("section_id", "question_id", "canonical_name", "units",
-  "n_total", "n_populated", "n_parsed", "n_unparsed", "n_missing")]
-numeric_display$parse_success_percent <- ifelse(
-  numeric_display$n_populated > 0,
-  100 * numeric_display$n_parsed / numeric_display$n_populated, NA_real_)
-cat(table_html(numeric_display))
+numeric_display <- data.frame(
+  Section = section_label(numeric),
+  `Question / Variable` = question_label(numeric),
+  Units = fmt(numeric$units),
+  Entered = fmt_integer(numeric$n_populated),
+  Parsed = fmt_integer(numeric$n_parsed),
+  Unparsed = fmt_integer(numeric$n_unparsed),
+  `Parse success (%)` = fmt_percent(ifelse(numeric$n_populated > 0,
+    100 * numeric$n_parsed / numeric$n_populated, NA_real_)),
+  check.names = FALSE
+)
+cat(table_html(numeric_display, "epi-table-wide"))
 ```
 
 ## Date parsing quality
 
 ```{r, results='asis'}
-dates <- p$date_summaries[c("section_id", "question_id", "canonical_name",
-  "n_total", "n_populated", "n_parsed", "n_unparsed", "n_missing")]
-dates$parse_success_percent <- ifelse(
-  dates$n_populated > 0, 100 * dates$n_parsed / dates$n_populated, NA_real_)
-cat(table_html(dates))
+dates <- p$date_summaries
+date_display <- data.frame(
+  Section = section_label(dates),
+  `Question / Variable` = question_label(dates),
+  Entered = fmt_integer(dates$n_populated),
+  Parsed = fmt_integer(dates$n_parsed),
+  Unparsed = fmt_integer(dates$n_unparsed),
+  `Parse success (%)` = fmt_percent(ifelse(dates$n_populated > 0,
+    100 * dates$n_parsed / dates$n_populated, NA_real_)),
+  check.names = FALSE
+)
+cat(table_html(date_display, "epi-table-wide"))
 ```
 
 ## Missingness overview
@@ -129,16 +182,36 @@ missing and total counts. They are descriptive displays, not quality thresholds.
 
 ```{r, results='asis'}
 scalar <- p$scalar_frequencies
-scalar_missing <- scalar[!duplicated(scalar$canonical_name),
-  c("section_id", "question_id", "canonical_name", "n_cases_total", "n_answered", "n_missing")]
-names(scalar_missing)[names(scalar_missing) == "n_cases_total"] <- "n_total"
-numeric_missing <- numeric[c("section_id", "question_id", "canonical_name", "n_total", "n_missing")]
-date_missing <- dates[c("section_id", "question_id", "canonical_name", "n_total", "n_missing")]
-missingness <- dplyr::bind_rows(scalar_missing, numeric_missing, date_missing)
-missingness$missing_percent <- ifelse(missingness$n_total > 0,
-  100 * missingness$n_missing / missingness$n_total, NA_real_)
-missingness <- missingness[order(-missingness$missing_percent, missingness$canonical_name), , drop = FALSE]
-cat(table_html(missingness))
+scalar_missing <- scalar[!duplicated(scalar$canonical_name), , drop = FALSE]
+missingness <- dplyr::bind_rows(
+  data.frame(Section = section_label(scalar_missing),
+    `Question / Variable` = question_label(scalar_missing),
+    Total = scalar_missing$n_cases_total, Missing = scalar_missing$n_missing,
+    check.names = FALSE),
+  data.frame(Section = section_label(numeric),
+    `Question / Variable` = question_label(numeric),
+    Total = numeric$n_total, Missing = numeric$n_missing,
+    check.names = FALSE),
+  data.frame(Section = section_label(dates),
+    `Question / Variable` = question_label(dates),
+    Total = dates$n_total, Missing = dates$n_missing,
+    check.names = FALSE)
+)
+missingness$`Missing (%)` <- ifelse(missingness$Total > 0,
+  100 * missingness$Missing / missingness$Total, NA_real_)
+missingness <- missingness[order(-missingness$`Missing (%)`, missingness$`Question / Variable`), , drop = FALSE]
+missing_display <- missingness
+missing_display$Total <- fmt_integer(missing_display$Total)
+missing_display$Missing <- fmt_integer(missing_display$Missing)
+missing_display$`Missing (%)` <- fmt_percent(missing_display$`Missing (%)`)
+shown <- seq_len(min(15L, nrow(missing_display)))
+cat(table_html(missing_display[shown, , drop = FALSE], "epi-table-compact"))
+if (nrow(missing_display) > length(shown)) {
+  cat("<p class='epi-caption'>Showing the 15 variables with greatest missingness; expand for the complete table.</p>")
+  cat("<details><summary>Details: complete missingness table</summary>\n")
+  cat(table_html(missing_display, "epi-table-wide"))
+  cat("</details>\n")
+}
 ```
 
 ## Privacy review summary
@@ -147,10 +220,32 @@ Only aggregate privacy metadata is included below. Review rows and tested
 strings are never staged for the report.
 
 ```{r, results='asis'}
-if (nrow(privacy$manifest) > 0L) cat(table_html(privacy$manifest), "\n\n", sep = "") else
+if (nrow(privacy$manifest) > 0L) {
+  privacy_manifest <- data.frame(
+    Status = as.character(privacy$manifest$status),
+    Warnings = fmt_integer(privacy$manifest$privacy_warnings),
+    Errors = fmt_integer(privacy$manifest$privacy_errors),
+    `Free-text fields withheld` = fmt_integer(privacy$manifest$free_text_fields_withheld),
+    check.names = FALSE
+  )
+  cat(table_html(privacy_manifest, "epi-table-compact"), "\n\n", sep = "")
+} else
   cat("No de-identification manifest was available.\n\n")
-cat(table_html(privacy$review), "\n\n", sep = "")
-cat(table_html(privacy$leak_audit))
+privacy_review <- data.frame(
+  `Review records` = fmt_integer(privacy$review$n_review_rows),
+  `Cases affected` = fmt_integer(privacy$review$n_cases_affected),
+  `Fields affected` = fmt_integer(privacy$review$n_fields_affected),
+  check.names = FALSE
+)
+privacy_audit <- data.frame(
+  `Audit findings` = fmt_integer(privacy$leak_audit$n_audit_rows),
+  Errors = fmt_integer(privacy$leak_audit$n_errors),
+  Warnings = fmt_integer(privacy$leak_audit$n_warnings),
+  Status = as.character(privacy$leak_audit$status),
+  check.names = FALSE
+)
+cat(table_html(privacy_review, "epi-table-compact"), "\n\n", sep = "")
+cat(table_html(privacy_audit, "epi-table-compact"))
 ```
 
 ## Repeated-table completeness
@@ -159,7 +254,14 @@ cat(table_html(privacy$leak_audit))
 tables <- p$repeated_table_summaries[c("table_name", "n_cases_total",
   "n_cases_with_records", "n_records_total", "median_records_per_case",
   "max_records_per_case")]
-cat(table_html(tables))
+names(tables) <- c("Table", "Cases", "Cases with records", "Records",
+  "Median / case", "Max / case")
+tables$Cases <- fmt_integer(tables$Cases)
+tables$`Cases with records` <- fmt_integer(tables$`Cases with records`)
+tables$Records <- fmt_integer(tables$Records)
+tables$`Median / case` <- fmt_decimal(tables$`Median / case`)
+tables$`Max / case` <- fmt_integer(tables$`Max / case`)
+cat(table_html(tables, "epi-table-compact"))
 ```
 
 ## Provenance

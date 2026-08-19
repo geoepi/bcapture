@@ -15,6 +15,11 @@
   stats::setNames(as.character(tools::md5sum(files)), fs::path_rel(files, path))
 }
 
+.report_table_headers <- function(html) {
+  matches <- regmatches(html, gregexpr("(?s)<th[^>]*>.*?</th>", html, perl = TRUE))[[1L]]
+  gsub("\\s+", " ", trimws(gsub("<[^>]+>", "", matches)))
+}
+
 test_that("installed report templates and command construction are stable", {
   expect_true(file.exists(system.file("quarto", "initial-epi-summary.qmd", package = "bcapture")))
   expect_true(file.exists(system.file("quarto", "initial-epi-quality.qmd", package = "bcapture")))
@@ -90,6 +95,8 @@ test_that("synthetic summary and quality reports render atomically", {
   expect_false(file.exists(paste0(quality_file, "_files")))
   summary_html <- paste(readLines(summary_file, warn = FALSE), collapse = "\n")
   quality_html <- paste(readLines(quality_file, warn = FALSE), collapse = "\n")
+  summary_headers <- .report_table_headers(summary_html)
+  quality_headers <- .report_table_headers(quality_html)
   expect_match(summary_html, "Initial Epi Descriptive Summary")
   expect_match(summary_html, "controlled analytical use")
   expect_match(summary_html, "Dataset overview")
@@ -98,6 +105,12 @@ test_that("synthetic summary and quality reports render atomically", {
   expect_match(summary_html, "Numeric summaries")
   expect_match(summary_html, "Date summaries")
   expect_match(summary_html, "Percentages within a multiselect question need not sum to 100%")
+  expect_true(grepl("epi-table-scroll", summary_html, fixed = TRUE))
+  expect_true(grepl("epi-table-wide", summary_html, fixed = TRUE))
+  expect_true(grepl("Question / Variable", paste(summary_headers, collapse = " "), fixed = TRUE))
+  expect_true(grepl("Median / case", paste(summary_headers, collapse = " "), fixed = TRUE))
+  expect_false(any(grepl("canonical_name|n_unparsed|missing_percent|parse_success_percent",
+    summary_headers)))
   repeated_tables <- readr::read_csv(
     file.path(deidentified_dir, "summary", "repeated_table_summaries.csv"),
     show_col_types = FALSE
@@ -113,6 +126,12 @@ test_that("synthetic summary and quality reports render atomically", {
   expect_match(quality_html, "Missingness overview")
   expect_match(quality_html, "Privacy review summary")
   expect_match(quality_html, "No identifier leaks detected")
+  expect_true(grepl("epi-table-scroll", quality_html, fixed = TRUE))
+  expect_true(grepl("epi-table-wide", quality_html, fixed = TRUE))
+  expect_true(grepl("Parse success (%)", paste(quality_headers, collapse = " "), fixed = TRUE))
+  expect_true(grepl("Missing (%)", paste(quality_headers, collapse = " "), fixed = TRUE))
+  expect_false(any(grepl("canonical_name|n_unparsed|missing_percent|parse_success_percent",
+    quality_headers)))
   known <- c("SYNTHETIC-PREMISES-", "PERSON-", "ORG-", "ENTITY-", "CONTACT-",
     "LOCATION-", "Owner One", "Second Owner", "Third Owner", "Visitor A",
     "Visitor B", "Visitor C")

@@ -11,6 +11,19 @@
 body {
   color: var(--epi-ink);
   line-height: 1.55;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+#quarto-content,
+#quarto-document-content,
+main.content {
+  min-width: 0;
+  max-width: none;
+}
+
+#quarto-document-content {
+  width: min(100%, 90rem);
 }
 
 h1, h2, h3, h4 {
@@ -38,13 +51,44 @@ h2 {
   margin-top: -.4rem;
 }
 
-.table {
-  width: auto;
-  min-width: 60%;
+.epi-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 1rem 0 1.5rem 0;
+  -webkit-overflow-scrolling: touch;
 }
 
-.table th {
+.epi-table-scroll .epi-table {
+  width: 100%;
+  min-width: max-content;
+  margin: 0;
+  table-layout: auto;
+}
+
+.epi-table th,
+.epi-table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.epi-table th {
   white-space: normal;
+  line-height: 1.2;
+}
+
+.epi-table-compact th,
+.epi-table-compact td {
+  padding: .35rem .5rem;
+}
+
+.epi-table-wide {
+  font-size: .9rem;
+}
+
+.epi-table-wide th,
+.epi-table-wide td {
+  min-width: 5rem;
 }
 
 .quarto-figure figcaption,

@@ -34,9 +34,35 @@ escape_html <- function(x) {
   gsub('"', "&quot;", x, fixed = TRUE)
 }
 fmt <- function(x) ifelse(is.na(x) | !nzchar(as.character(x)), "-", as.character(x))
-table_html <- function(x) {
+fmt_integer <- function(x) {
+  ifelse(is.na(x), "-", format(as.integer(round(as.numeric(x))), big.mark = ",", trim = TRUE))
+}
+fmt_decimal <- function(x, digits = 1L) {
+  ifelse(is.na(x), "-", format(round(as.numeric(x), digits), nsmall = 0L,
+    trim = TRUE, scientific = FALSE))
+}
+fmt_percent <- function(x) fmt_decimal(x, 1L)
+humanize_name <- function(x) {
+  x <- gsub("_+", " ", as.character(x))
+  tools::toTitleCase(x)
+}
+question_label <- function(x) {
+  text <- if ("question_text" %in% names(x)) trimws(as.character(x$question_text)) else rep("", nrow(x))
+  fallback <- if ("canonical_name" %in% names(x)) humanize_name(x$canonical_name) else rep("", nrow(x))
+  use_text <- !is.na(text) & nzchar(text) & nchar(text) <= 80L
+  ifelse(use_text, text, fallback)
+}
+section_label <- function(x) {
+  text <- if ("section_name" %in% names(x)) trimws(as.character(x$section_name)) else rep("", nrow(x))
+  fallback <- if ("section_id" %in% names(x)) as.character(x$section_id) else rep("", nrow(x))
+  ifelse(!is.na(text) & nzchar(text), text, fallback)
+}
+table_html <- function(x, class = "epi-table") {
   if (nrow(x) == 0L) return("No rows to display.")
-  knitr::kable(x, format = "html", escape = TRUE)
+  classes <- unique(c("epi-table", strsplit(class, " +")[[1L]]))
+  html <- knitr::kable(x, format = "html", escape = TRUE,
+    table.attr = paste0('class="', paste(classes, collapse = " "), '"'))
+  paste0('<div class="epi-table-scroll">', html, "</div>")
 }
 section_rows <- function(...) {
   rows <- list(...)
@@ -98,7 +124,13 @@ print(ggplot2::ggplot(validation, ggplot2::aes_string(
     drop = FALSE) +
   ggplot2::theme_minimal(base_size = 11) +
   ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
-cat("\n\n", table_html(validation), sep = "")
+validation_display <- data.frame(
+  Status = as.character(validation$validation_status),
+  Cases = fmt_integer(validation$n_cases),
+  `Percent of cases` = fmt_percent(validation$percent_of_cases),
+  check.names = FALSE
+)
+cat("\n\n", table_html(validation_display, "epi-table-compact"), sep = "")
 ```
 
 ## Questionnaire summaries by section
@@ -124,7 +156,7 @@ for (section_id in sections) {
   section_scalar <- scalar[scalar$section_id == section_id, , drop = FALSE]
   for (question_id in unique(as.character(section_scalar$question_id))) {
     current <- section_scalar[section_scalar$question_id == question_id, , drop = FALSE]
-    question_text <- current$question_text[[1L]]
+    question_text <- question_label(current)[[1L]]
     cat("#### ", escape_html(question_id), ": ", escape_html(question_text), "\n\n", sep = "")
     current$response_label <- fmt(current$response_label)
     if (all(as.numeric(current$n_answered) == 0)) {
@@ -160,7 +192,7 @@ for (section_id in sections) {
   section_multi <- multi[multi$section_id == section_id, , drop = FALSE]
   for (question_id in unique(as.character(section_multi$question_id))) {
     current <- section_multi[section_multi$question_id == question_id, , drop = FALSE]
-    cat("#### ", escape_html(question_id), ": ", escape_html(current$question_text[[1L]]), "\n\n", sep = "")
+    cat("#### ", escape_html(question_id), ": ", escape_html(question_label(current)[[1L]]), "\n\n", sep = "")
     current$item_label <- fmt(current$item_label)
     current$item_label <- factor(current$item_label, levels = rev(current$item_label))
     print(ggplot2::ggplot(current, ggplot2::aes_string(
@@ -188,16 +220,21 @@ response, not cases.
 tables <- p$repeated_table_summaries
 display <- tables[c("table_name", "n_cases_with_records", "n_records_total",
                     "median_records_per_case", "max_records_per_case")]
-names(display) <- c("Table", "Cases with records", "Total records",
-                    "Median records per case", "Maximum records per case")
-cat(table_html(display), "\n\n", sep = "")
+names(display) <- c("Table", "Cases", "Records", "Median / case", "Max / case")
+display$Cases <- fmt_integer(display$Cases)
+display$Records <- fmt_integer(display$Records)
+display$`Median / case` <- fmt_decimal(display$`Median / case`)
+display$`Max / case` <- fmt_integer(display$`Max / case`)
+cat(table_html(display, "epi-table-compact"), "\n\n", sep = "")
+cat("<p class='epi-caption'>Cases and records refer to repeated-table records; median and maximum are records per case.</p>\n\n")
 if (nrow(repeated_categorical) > 0L) {
   repeated_display <- repeated_categorical[c(
-    "table_name", "column_name", "response_label", "n_records_total",
-    "n_nonmissing", "n_value", "percent_of_nonmissing")]
-  names(repeated_display) <- c("Table", "Column", "Response", "Records",
-    "Nonmissing records", "Value count", "Percent of nonmissing records")
-  cat(table_html(repeated_display))
+    "table_name", "column_name", "response_label", "n_value", "percent_of_nonmissing")]
+  repeated_display$column_name <- humanize_name(repeated_display$column_name)
+  repeated_display$n_value <- fmt_integer(repeated_display$n_value)
+  repeated_display$percent_of_nonmissing <- fmt_percent(repeated_display$percent_of_nonmissing)
+  names(repeated_display) <- c("Table", "Variable", "Response", "N", "Percent (%)")
+  cat(table_html(repeated_display, "epi-table-wide"))
 }
 ```
 
@@ -208,13 +245,25 @@ report does not reconstruct distributions from aggregate statistics.
 
 ```{r, results='asis'}
 numeric <- p$numeric_summaries
-numeric_display <- numeric[c("section_id", "question_id", "canonical_name", "units",
-  "n_parsed", "n_unparsed", "n_missing", "mean", "sd", "median", "q25", "q75", "min", "max")]
-cat(table_html(numeric_display), "\n\n", sep = "")
+numeric_display <- data.frame(
+  Section = section_label(numeric),
+  `Question / Variable` = question_label(numeric),
+  Units = fmt(numeric$units),
+  Parsed = fmt_integer(numeric$n_parsed),
+  Unparsed = fmt_integer(numeric$n_unparsed),
+  Missing = fmt_integer(numeric$n_missing),
+  Median = fmt_decimal(numeric$median),
+  Q1 = fmt_decimal(numeric$q25),
+  Q3 = fmt_decimal(numeric$q75),
+  Min = fmt_decimal(numeric$min),
+  Max = fmt_decimal(numeric$max),
+  check.names = FALSE
+)
+cat(table_html(numeric_display, "epi-table-wide"), "\n\n", sep = "")
 plot_data <- numeric[!is.na(numeric$median), , drop = FALSE]
 if (nrow(plot_data) > 0L) {
   plot_data$label <- ifelse(is.na(plot_data$units) | !nzchar(plot_data$units),
-    plot_data$canonical_name, paste0(plot_data$canonical_name, " (", plot_data$units, ")"))
+    question_label(plot_data), paste0(question_label(plot_data), " (", plot_data$units, ")"))
   print(ggplot2::ggplot(plot_data, ggplot2::aes_string(x = "label", y = "median")) +
     ggplot2::geom_linerange(ggplot2::aes_string(ymin = "min", ymax = "max"), colour = "#9aaab2", linewidth = 1) +
     ggplot2::geom_errorbar(ggplot2::aes_string(ymin = "q25", ymax = "q75"), width = .2, colour = "#2c6e8f", linewidth = 2) +
@@ -230,9 +279,19 @@ if (nrow(plot_data) > 0L) {
 Date ranges and parsing counts are displayed directly from `date_summaries.csv`.
 
 ```{r, results='asis'}
-dates <- p$date_summaries[c("section_id", "question_id", "canonical_name",
-  "n_parsed", "n_unparsed", "n_missing", "min_date", "median_date", "max_date")]
-cat(table_html(dates))
+dates <- p$date_summaries
+date_display <- data.frame(
+  Section = section_label(dates),
+  `Question / Variable` = question_label(dates),
+  Parsed = fmt_integer(dates$n_parsed),
+  Unparsed = fmt_integer(dates$n_unparsed),
+  Missing = fmt_integer(dates$n_missing),
+  Earliest = fmt(dates$min_date),
+  Median = fmt(dates$median_date),
+  Latest = fmt(dates$max_date),
+  check.names = FALSE
+)
+cat(table_html(date_display, "epi-table-wide"))
 ```
 
 ## Notes on denominators and missingness
