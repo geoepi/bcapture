@@ -21,8 +21,18 @@
 }
 
 test_that("installed report templates and command construction are stable", {
-  expect_true(file.exists(system.file("quarto", "initial-epi-summary.qmd", package = "bcapture")))
-  expect_true(file.exists(system.file("quarto", "initial-epi-quality.qmd", package = "bcapture")))
+  summary_template <- system.file("quarto", "initial-epi-summary.qmd", package = "bcapture")
+  quality_template <- system.file("quarto", "initial-epi-quality.qmd", package = "bcapture")
+  expect_true(file.exists(summary_template))
+  expect_true(file.exists(quality_template))
+  expect_match(paste(readLines(summary_template, warn = FALSE), collapse = "\n"),
+    "plot_epi_categorical_report")
+  expect_match(paste(readLines(summary_template, warn = FALSE), collapse = "\n"),
+    "plot_epi_multiselect_report")
+  expect_match(paste(readLines(summary_template, warn = FALSE), collapse = "\n"),
+    "plot_epi_numeric_report")
+  expect_match(paste(readLines(quality_template, warn = FALSE), collapse = "\n"),
+    "plot_epi_validation_report")
   args <- bcapture:::.epi_report_quarto_args(
     "C:/path with spaces/template.qmd", "C:/stage with spaces", "report.html",
     "C:/data with spaces/report-params.yml"

@@ -15,6 +15,7 @@ execute:
   message: false
 params:
   data_file: null
+  plot_helpers: null
   report_title: "Initial Epi Data Quality Review"
   generated_at: null
 ---
@@ -22,6 +23,13 @@ params:
 ```{r}
 data <- readRDS(params$data_file)
 p <- data
+if (!requireNamespace("bcapture", quietly = TRUE)) {
+  if (is.null(params$plot_helpers) || !file.exists(params$plot_helpers))
+    stop("bcapture package is required to render this report.")
+  source(params$plot_helpers, local = .GlobalEnv)
+}
+plot_epi_validation_report <- if (requireNamespace("bcapture", quietly = TRUE))
+  bcapture::plot_epi_validation else plot_epi_validation
 manifest <- p$summary_manifest
 overview <- p$dataset_overview
 status <- as.character(manifest$status[[1L]])
@@ -99,15 +107,7 @@ cat(table_html(readiness))
 
 ```{r, results='asis'}
 validation <- p$validation_status_summary
-validation$validation_status <- factor(validation$validation_status,
-  levels = c("valid", "review", "error"))
-print(ggplot2::ggplot(validation, ggplot2::aes_string(
-  x = "validation_status", y = "n_cases", fill = "validation_status"
-)) + ggplot2::geom_col(show.legend = FALSE) +
-  ggplot2::scale_fill_manual(values = c(valid = "#3b7d5a", review = "#9a6b20", error = "#a94a4a"),
-    drop = FALSE) + ggplot2::labs(x = "Validation status", y = "Cases") +
-  ggplot2::theme_minimal(base_size = 11) +
-  ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+print(plot_epi_validation_report(p, type = "status"))
 validation_display <- data.frame(
   Status = as.character(validation$validation_status),
   Cases = fmt_integer(validation$n_cases),

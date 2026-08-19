@@ -325,6 +325,10 @@ render_epi_report <- function(deidentified_dir, report = c("summary", "quality")
     "Initial Epi Data Quality Review"
   writeLines(c(
     paste0("data_file: ", .epi_report_yaml_value(data_file)),
+    if (file.exists(fs::path(fs::path_dir(template), "..", "..", "R", "plot-epi.R")))
+      paste0("plot_helpers: ", .epi_report_yaml_value(fs::path_norm(
+        fs::path(fs::path_dir(template), "..", "..", "R", "plot-epi.R")))) else
+      "plot_helpers: null",
     paste0("report_title: ", .epi_report_yaml_value(title)),
     paste0("generated_at: ", .epi_report_yaml_value(generated_at))
   ), params_file, useBytes = TRUE)

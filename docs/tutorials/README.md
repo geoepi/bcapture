@@ -20,6 +20,8 @@ obviously fictional values.
   crosswalk separate.
 - [Initial Epi descriptive summaries](../initial-epi-summaries.md): create
   metadata-driven descriptive products from the de-identified dataset.
+- [Initial Epi Visualization](initial-epi-visualization.md): create reusable
+  ggplot objects from the summary products.
 - [Initial Epi HTML Reporting](initial-epi-reporting.md): render self-contained
   descriptive and data-quality reports from summary products.
 
