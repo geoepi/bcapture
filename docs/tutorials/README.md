@@ -18,6 +18,8 @@ obviously fictional values.
 - [Initial Epi De-identification Workflow](initial-epi-deidentification.md):
   create a controlled-use pseudonymized analysis dataset and keep its private
   crosswalk separate.
+- [Initial Epi descriptive summaries](../initial-epi-summaries.md): create
+  metadata-driven descriptive products from the de-identified dataset.
 
 The current package boundary is:
 
@@ -27,7 +29,7 @@ extraction + schema diagnostics
 
 Initial Epi:
 extraction + schema diagnostics + semantic collation
-+ validation + de-identification
++ validation + de-identification + descriptive summaries
 ~~~
 
 BCAP does not currently provide semantic collation, validation, or

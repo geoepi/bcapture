@@ -1,5 +1,9 @@
 # bcapture 0.0.0.9000
 
+* Added summarize_epi() for metadata-driven descriptive summaries of
+  de-identified Initial Epi analytical data, including categorical,
+  multiselect, numeric, date, repeated-table, and validation summaries.
+
 * Added user-facing synthetic workflow tutorials for BCAP extraction and the
   complete Initial Epi extraction, collation, validation, and de-identification
   workflow.

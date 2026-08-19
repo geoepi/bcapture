@@ -16,8 +16,9 @@ and [the output contract](docs/output-structure.md) for details.
 
 The package establishes a stable extraction layer for the broader BCAP audit
 workflow: extraction, collation, validation, summarization, and reporting.
-Initial Epi extraction and its first versioned semantic collation layer are
-implemented; later analysis layers remain separate.
+Initial Epi extraction, semantic collation, validation, de-identification, and
+metadata-driven descriptive summaries are implemented; later visualization
+and reporting layers remain separate.
 
 ## Installation
 
@@ -59,6 +60,10 @@ analysis <- deidentify_epi(
   deidentified_dir = "epi_analysis",
   crosswalk_dir = "D:/secure/bcapture_crosswalks/example_epi_project"
 )
+
+summary <- summarize_epi(
+  deidentified_dir = "epi_analysis"
+)
 ```
 
 The Initial Epi workflow is layered:
@@ -83,6 +88,7 @@ For complete synthetic user workflows, see the
 - [BCAP workflow](docs/tutorials/bcap-workflow.md)
 - [Initial Epi workflow](docs/tutorials/initial-epi-workflow.md)
 - [Initial Epi de-identification](docs/tutorials/initial-epi-deidentification.md)
+- [Initial Epi descriptive summaries](docs/initial-epi-summaries.md)
 
 The current extractor reads interactive PDF form fields directly. It does not
 use OCR and does not yet extract handwritten values from scanned forms.
@@ -142,10 +148,10 @@ type. Flattened or scanned forms are recorded as `no_acroform_fields`.
 
 ## Current limitations
 
-OCR, handwriting recognition, audit scoring, analytical summaries, and
-dashboards are not implemented. The Initial Epi dictionary describes the
-questionnaire and its encodings; extraction, collation, and data-quality
-validation do not infer biological meaning or risk.
+OCR, handwriting recognition, audit scoring, dashboards, and inferential
+analysis are not implemented. Descriptive summaries are controlled-use
+products; the Initial Epi dictionary describes the questionnaire and its
+encodings, and no layer infers biological meaning or risk.
 
 ## Development roadmap
 
