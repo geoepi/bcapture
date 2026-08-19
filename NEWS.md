@@ -1,5 +1,8 @@
 # bcapture 0.0.0.9000
 
+* Added Quarto-based self-contained HTML reporting for de-identified Initial
+  Epi analytical summaries, including descriptive and data-quality reports.
+
 * Added summarize_epi() for metadata-driven descriptive summaries of
   de-identified Initial Epi analytical data, including categorical,
   multiselect, numeric, date, repeated-table, and validation summaries.

@@ -16,9 +16,10 @@ and [the output contract](docs/output-structure.md) for details.
 
 The package establishes a stable extraction layer for the broader BCAP audit
 workflow: extraction, collation, validation, summarization, and reporting.
-Initial Epi extraction, semantic collation, validation, de-identification, and
-metadata-driven descriptive summaries are implemented; later visualization
-and reporting layers remain separate.
+Initial Epi extraction, semantic collation, validation, de-identification,
+metadata-driven descriptive summaries, and Quarto HTML reporting are
+implemented. Reporting consumes summary products and does not recalculate
+their descriptive statistics.
 
 ## Installation
 
@@ -64,6 +65,16 @@ analysis <- deidentify_epi(
 summary <- summarize_epi(
   deidentified_dir = "epi_analysis"
 )
+
+summary_report <- render_epi_report(
+  deidentified_dir = "epi_analysis",
+  report = "summary"
+)
+
+quality_report <- render_epi_report(
+  deidentified_dir = "epi_analysis",
+  report = "quality"
+)
 ```
 
 The Initial Epi workflow is layered:
@@ -89,6 +100,7 @@ For complete synthetic user workflows, see the
 - [Initial Epi workflow](docs/tutorials/initial-epi-workflow.md)
 - [Initial Epi de-identification](docs/tutorials/initial-epi-deidentification.md)
 - [Initial Epi descriptive summaries](docs/initial-epi-summaries.md)
+- [Initial Epi HTML reporting](docs/tutorials/initial-epi-reporting.md)
 
 The current extractor reads interactive PDF form fields directly. It does not
 use OCR and does not yet extract handwritten values from scanned forms.
