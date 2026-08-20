@@ -1,5 +1,8 @@
 # bcapture 0.0.0.9000
 
+* Added reusable Initial Epi visualization functions for categorical,
+  multiselect, numeric, repeated-table, and validation summaries.
+
 * Added Quarto-based self-contained HTML reporting for de-identified Initial
   Epi analytical summaries, including descriptive and data-quality reports.
 

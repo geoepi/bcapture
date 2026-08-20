@@ -12,7 +12,7 @@ lead:
   github: JMHumphreys
 
 status: active
-current_focus: Initial Epi Quarto reporting and visualization from de-identified summary products.
+current_focus: Initial Epi reusable scientific visualization from de-identified summary products.
 
 repository:
   canonical: geoepi/bcapture
@@ -22,5 +22,5 @@ compute:
   - Atlas
 
 next_milestone:
-  description: Review Initial Epi reporting outputs and begin higher-level analytical visualizations
+  description: Develop domain-specific analytical products using stable summaries and plots
   target: 2026-10-01

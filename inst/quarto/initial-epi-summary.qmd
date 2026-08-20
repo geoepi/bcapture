@@ -15,6 +15,7 @@ execute:
   message: false
 params:
   data_file: null
+  plot_helpers: null
   report_title: "Initial Epi Descriptive Summary"
   generated_at: null
 ---
@@ -22,6 +23,19 @@ params:
 ```{r}
 data <- readRDS(params$data_file)
 p <- data
+if (!requireNamespace("bcapture", quietly = TRUE)) {
+  if (is.null(params$plot_helpers) || !file.exists(params$plot_helpers))
+    stop("bcapture package is required to render this report.")
+  source(params$plot_helpers, local = .GlobalEnv)
+}
+plot_epi_validation_report <- if (requireNamespace("bcapture", quietly = TRUE))
+  bcapture::plot_epi_validation else plot_epi_validation
+plot_epi_categorical_report <- if (requireNamespace("bcapture", quietly = TRUE))
+  bcapture::plot_epi_categorical else plot_epi_categorical
+plot_epi_multiselect_report <- if (requireNamespace("bcapture", quietly = TRUE))
+  bcapture::plot_epi_multiselect else plot_epi_multiselect
+plot_epi_numeric_report <- if (requireNamespace("bcapture", quietly = TRUE))
+  bcapture::plot_epi_numeric else plot_epi_numeric
 overview <- p$dataset_overview
 manifest <- p$summary_manifest
 status <- as.character(manifest$status[[1L]])
@@ -113,17 +127,7 @@ cat(table_html(overview_table))
 
 ```{r, results='asis'}
 validation <- p$validation_status_summary
-validation$validation_status <- factor(validation$validation_status,
-  levels = c("valid", "review", "error"))
-print(ggplot2::ggplot(validation, ggplot2::aes_string(
-  x = "validation_status", y = "n_cases", fill = "validation_status"
-)) +
-  ggplot2::geom_col(show.legend = FALSE) +
-  ggplot2::labs(x = "Validation status", y = "Cases") +
-  ggplot2::scale_fill_manual(values = c(valid = "#3b7d5a", review = "#9a6b20", error = "#a94a4a"),
-    drop = FALSE) +
-  ggplot2::theme_minimal(base_size = 11) +
-  ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+print(plot_epi_validation_report(p, type = "status"))
 validation_display <- data.frame(
   Status = as.character(validation$validation_status),
   Cases = fmt_integer(validation$n_cases),
@@ -165,18 +169,8 @@ for (section_id in sections) {
       next
     }
     if (nrow(current) <= 8L) {
-      response_levels <- current$response_label[order(current$response_order,
-        seq_len(nrow(current)), na.last = TRUE)]
-      current$response_label <- factor(current$response_label,
-        levels = unique(response_levels))
-      print(ggplot2::ggplot(current, ggplot2::aes_string(
-        x = "percent_of_answered", y = "response_label"
-      )) +
-        ggplot2::geom_col(fill = "#2c6e8f") +
-        ggplot2::labs(x = "Percent of answered cases", y = NULL) +
-        ggplot2::scale_y_discrete(labels = wrap_label) +
-        ggplot2::theme_minimal(base_size = 11) +
-        ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+      print(plot_epi_categorical_report(p, variable = unique(as.character(current$canonical_name))[[1L]],
+        denominator = "answered", show_counts = FALSE, show_missing = FALSE))
     } else {
       display <- current[c("response_label", "n_response", "percent_of_answered", "n_answered", "n_missing", "n_cases_total")]
       names(display) <- c("Response", "Responses", "Percent of answered", "Answered", "Missing", "Cases")
@@ -193,16 +187,8 @@ for (section_id in sections) {
   for (question_id in unique(as.character(section_multi$question_id))) {
     current <- section_multi[section_multi$question_id == question_id, , drop = FALSE]
     cat("#### ", escape_html(question_id), ": ", escape_html(question_label(current)[[1L]]), "\n\n", sep = "")
-    current$item_label <- fmt(current$item_label)
-    current$item_label <- factor(current$item_label, levels = rev(current$item_label))
-    print(ggplot2::ggplot(current, ggplot2::aes_string(
-      x = "percent_of_all_cases", y = "item_label"
-    )) +
-      ggplot2::geom_col(fill = "#6b8e9e") +
-      ggplot2::labs(x = "Percent of all cases", y = "Selected item") +
-      ggplot2::scale_y_discrete(labels = wrap_label) +
-      ggplot2::theme_minimal(base_size = 11) +
-      ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
+    print(plot_epi_multiselect_report(p, variable = question_id,
+      denominator = "all_cases"))
     cat("<p class='epi-caption'>Cases with any selection: ",
         current$n_cases_with_any_selection[[1L]],
         ". Percentages within a multiselect question need not sum to 100%.</p>\n", sep = "")
@@ -261,17 +247,8 @@ numeric_display <- data.frame(
 )
 cat(table_html(numeric_display, "epi-table-wide"), "\n\n", sep = "")
 plot_data <- numeric[!is.na(numeric$median), , drop = FALSE]
-if (nrow(plot_data) > 0L) {
-  plot_data$label <- ifelse(is.na(plot_data$units) | !nzchar(plot_data$units),
-    question_label(plot_data), paste0(question_label(plot_data), " (", plot_data$units, ")"))
-  print(ggplot2::ggplot(plot_data, ggplot2::aes_string(x = "label", y = "median")) +
-    ggplot2::geom_linerange(ggplot2::aes_string(ymin = "min", ymax = "max"), colour = "#9aaab2", linewidth = 1) +
-    ggplot2::geom_errorbar(ggplot2::aes_string(ymin = "q25", ymax = "q75"), width = .2, colour = "#2c6e8f", linewidth = 2) +
-    ggplot2::geom_point(size = 2.5, colour = "#24313a") +
-    ggplot2::coord_flip() + ggplot2::labs(x = NULL, y = "Value") +
-    ggplot2::theme_minimal(base_size = 11) +
-    ggplot2::theme(panel.grid.minor = ggplot2::element_blank()))
-}
+if (nrow(plot_data) > 0L) for (variable in unique(as.character(plot_data$canonical_name)))
+  print(plot_epi_numeric_report(p, variable = variable))
 ```
 
 ## Date summaries

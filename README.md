@@ -66,6 +66,11 @@ summary <- summarize_epi(
   deidentified_dir = "epi_analysis"
 )
 
+plot_epi_validation(
+  summary,
+  type = "status"
+)
+
 summary_report <- render_epi_report(
   deidentified_dir = "epi_analysis",
   report = "summary"
@@ -100,6 +105,7 @@ For complete synthetic user workflows, see the
 - [Initial Epi workflow](docs/tutorials/initial-epi-workflow.md)
 - [Initial Epi de-identification](docs/tutorials/initial-epi-deidentification.md)
 - [Initial Epi descriptive summaries](docs/initial-epi-summaries.md)
+- [Initial Epi visualization](docs/tutorials/initial-epi-visualization.md)
 - [Initial Epi HTML reporting](docs/tutorials/initial-epi-reporting.md)
 
 The current extractor reads interactive PDF form fields directly. It does not
