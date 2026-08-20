@@ -12,7 +12,7 @@ lead:
   github: JMHumphreys
 
 status: active
-current_focus: Initial Epi reusable scientific visualization from de-identified summary products.
+current_focus: Initial Epi case-level analytical features from de-identified products.
 
 repository:
   canonical: geoepi/bcapture
@@ -22,5 +22,5 @@ compute:
   - Atlas
 
 next_milestone:
-  description: Develop domain-specific analytical products using stable summaries and plots
+  description: Develop domain-specific epidemiological analyses using validated feature products
   target: 2026-10-01

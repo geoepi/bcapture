@@ -1,0 +1,2 @@
+feature_schema_version,feature_version,form_version,n_features,n_domains,feature_registry_hash,description
+1,1,2024-05-28,40,9,31048de92375a34363ff51b7c27030125ceea65b15fb7f57d06d430519f83632,Versioned auditable case-level analytical feature registry for de-identified Initial Epi data.

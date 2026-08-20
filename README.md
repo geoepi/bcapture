@@ -17,9 +17,9 @@ and [the output contract](docs/output-structure.md) for details.
 The package establishes a stable extraction layer for the broader BCAP audit
 workflow: extraction, collation, validation, summarization, and reporting.
 Initial Epi extraction, semantic collation, validation, de-identification,
-metadata-driven descriptive summaries, and Quarto HTML reporting are
-implemented. Reporting consumes summary products and does not recalculate
-their descriptive statistics.
+metadata-driven descriptive summaries, Quarto HTML reporting, and auditable
+case-level analytical feature derivation are implemented. Reporting consumes
+summary products and does not recalculate their descriptive statistics.
 
 ## Installation
 
@@ -66,6 +66,10 @@ summary <- summarize_epi(
   deidentified_dir = "epi_analysis"
 )
 
+features <- derive_epi_features(
+  deidentified_dir = "epi_analysis"
+)
+
 plot_epi_validation(
   summary,
   type = "status"
@@ -82,10 +86,12 @@ quality_report <- render_epi_report(
 )
 ```
 
-The Initial Epi workflow is layered:
+The Initial Epi workflow branches after de-identification:
 
 ```text
-PDF -> extract -> collate -> validate -> de-identify -> analyze
+PDF -> extract -> collate -> validate -> de-identify
+                                      |-> summarize -> visualize -> report
+                                      `-> derive features -> future epidemiological analysis
 ```
 
 PDF extraction produces raw AcroForm data, collation produces semantic
@@ -94,7 +100,9 @@ relational data, validation produces reviewable data-quality findings, and
 analysis dataset. The crosswalk path must be outside the project repository
 and outside the de-identified output. The analysis profile is for controlled
 use; it is not an unrestricted public-release or irreversible anonymization
-workflow.
+workflow. `summarize_epi()` describes a collection of cases;
+`derive_epi_features()` creates transparent analysis-ready attributes for each
+case. Neither downstream branch is required by the other.
 
 ## Tutorials
 
@@ -105,6 +113,7 @@ For complete synthetic user workflows, see the
 - [Initial Epi workflow](docs/tutorials/initial-epi-workflow.md)
 - [Initial Epi de-identification](docs/tutorials/initial-epi-deidentification.md)
 - [Initial Epi descriptive summaries](docs/initial-epi-summaries.md)
+- [Initial Epi analytical features](docs/initial-epi-analytic-features.md)
 - [Initial Epi visualization](docs/tutorials/initial-epi-visualization.md)
 - [Initial Epi HTML reporting](docs/tutorials/initial-epi-reporting.md)
 

@@ -1,5 +1,8 @@
 # bcapture 0.0.0.9000
 
+* Added a versioned, privacy-gated, auditable case-level Initial Epi feature
+  registry and `derive_epi_features()` for de-identified analytical data.
+
 * Added reusable Initial Epi visualization functions for categorical,
   multiselect, numeric, repeated-table, and validation summaries.
 

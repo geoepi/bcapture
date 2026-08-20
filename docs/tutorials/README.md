@@ -20,6 +20,8 @@ obviously fictional values.
   crosswalk separate.
 - [Initial Epi descriptive summaries](../initial-epi-summaries.md): create
   metadata-driven descriptive products from the de-identified dataset.
+- [Initial Epi analytical features](initial-epi-analytic-features.md): derive
+  versioned case-level analytical attributes from de-identified data.
 - [Initial Epi Visualization](initial-epi-visualization.md): create reusable
   ggplot objects from the summary products.
 - [Initial Epi HTML Reporting](initial-epi-reporting.md): render self-contained
@@ -34,6 +36,7 @@ extraction + schema diagnostics
 Initial Epi:
 extraction + schema diagnostics + semantic collation
 + validation + de-identification + descriptive summaries
++ auditable case-level analytical features
 ~~~
 
 BCAP does not currently provide semantic collation, validation, or

@@ -2,6 +2,7 @@
 
 export(collate_epi)
 export(deidentify_epi)
+export(derive_epi_features)
 export(diagnose_epi)
 export(diagnose_hpai)
 export(extract_epi)
