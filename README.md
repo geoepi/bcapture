@@ -70,6 +70,19 @@ features <- derive_epi_features(
   deidentified_dir = "epi_analysis"
 )
 
+feature_summary <- summarize_epi_features(features)
+
+plot_epi_features(
+  feature_summary,
+  domain = "environment_wildlife",
+  type = "prevalence"
+)
+
+feature_report <- render_epi_report(
+  deidentified_dir = "epi_analysis",
+  report = "features"
+)
+
 plot_epi_validation(
   summary,
   type = "status"
@@ -91,7 +104,7 @@ The Initial Epi workflow branches after de-identification:
 ```text
 PDF -> extract -> collate -> validate -> de-identify
                                       |-> summarize -> visualize -> report
-                                      `-> derive features -> future epidemiological analysis
+                                      `-> derive features -> summarize -> visualize -> report
 ```
 
 PDF extraction produces raw AcroForm data, collation produces semantic
@@ -102,7 +115,8 @@ and outside the de-identified output. The analysis profile is for controlled
 use; it is not an unrestricted public-release or irreversible anonymization
 workflow. `summarize_epi()` describes a collection of cases;
 `derive_epi_features()` creates transparent analysis-ready attributes for each
-case. Neither downstream branch is required by the other.
+case, while `summarize_epi_features()` describes those attributes without
+recomputing them. Neither downstream branch is required by the other.
 
 ## Tutorials
 
@@ -114,6 +128,8 @@ For complete synthetic user workflows, see the
 - [Initial Epi de-identification](docs/tutorials/initial-epi-deidentification.md)
 - [Initial Epi descriptive summaries](docs/initial-epi-summaries.md)
 - [Initial Epi analytical features](docs/initial-epi-analytic-features.md)
+- [Initial Epi feature analysis](docs/initial-epi-feature-analysis.md)
+- [Initial Epi feature analysis tutorial](docs/tutorials/initial-epi-feature-analysis.md)
 - [Initial Epi visualization](docs/tutorials/initial-epi-visualization.md)
 - [Initial Epi HTML reporting](docs/tutorials/initial-epi-reporting.md)
 

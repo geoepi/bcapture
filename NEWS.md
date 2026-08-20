@@ -1,5 +1,7 @@
 # bcapture 0.0.0.9000
 
+* Added descriptive summaries, visualization, and self-contained Quarto HTML reporting for Initial Epi analytical features.
+
 * Added a versioned, privacy-gated, auditable case-level Initial Epi feature
   registry and `derive_epi_features()` for de-identified analytical data.
 

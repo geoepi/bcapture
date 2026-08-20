@@ -26,6 +26,8 @@ obviously fictional values.
   ggplot objects from the summary products.
 - [Initial Epi HTML Reporting](initial-epi-reporting.md): render self-contained
   descriptive and data-quality reports from summary products.
+- [Initial Epi Feature Analysis](initial-epi-feature-analysis.md): summarize,
+  visualize, and report derived analytical features without fitting models.
 
 The current package boundary is:
 
@@ -37,6 +39,7 @@ Initial Epi:
 extraction + schema diagnostics + semantic collation
 + validation + de-identification + descriptive summaries
 + auditable case-level analytical features
++ descriptive feature summaries, visualization, and reporting
 ~~~
 
 BCAP does not currently provide semantic collation, validation, or
