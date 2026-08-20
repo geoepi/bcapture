@@ -30,6 +30,60 @@
 }
 
 .epi_report_read_products <- function(deidentified_dir, report) {
+  if (identical(report, "features")) {
+    summary_dir <- fs::path(deidentified_dir, "features", "summary")
+    required <- .epi_feature_summary_files
+    if (!dir.exists(summary_dir) || any(!file.exists(fs::path(summary_dir, required)))) {
+      stop("Feature summary products are missing; run summarize_epi_features() first.",
+           call. = FALSE)
+    }
+    products <- purrr::map(required, ~ .epi_report_read_csv(
+      fs::path(summary_dir, .x), .x))
+    names(products) <- names(required)
+    manifest <- products$manifest
+    .epi_report_require_columns(manifest, c(
+      "feature_summary_schema_version", "form_version", "profile", "status",
+      "n_cases", "package_version", "created_at"
+    ), "feature_summary_manifest.csv")
+    if (nrow(manifest) != 1L ||
+        as.integer(manifest$feature_summary_schema_version[[1L]]) != 1L) stop(
+      "Unsupported feature summary schema version; expected feature_summary_schema_version == 1.",
+      call. = FALSE
+    )
+    if (!as.character(manifest$status[[1L]]) %in% c("passed", "review")) stop(
+      "Feature summary manifest status must be passed or review before rendering.",
+      call. = FALSE
+    )
+    dictionary_path <- fs::path(deidentified_dir, "features", "feature_dictionary.csv")
+    long_path <- fs::path(deidentified_dir, "features", "feature_long.csv")
+    if (!file.exists(dictionary_path) || !file.exists(long_path)) stop(
+      "Feature products are missing; run derive_epi_features() first.", call. = FALSE
+    )
+    dictionary <- .epi_report_read_csv(dictionary_path, "feature_dictionary.csv")
+    long <- .epi_report_read_csv(long_path, "feature_long.csv")
+    .epi_report_require_columns(dictionary, c(
+      "feature_order", "feature_name", "feature_label", "feature_type",
+      "domain_id", "domain_label", "source_question_id", "source_table", "description"
+    ), "feature_dictionary.csv")
+    .epi_report_require_columns(long, c(
+      "feature_name", "feature_label", "feature_type", "domain_id", "domain_label",
+      "value_status", "numeric_value"
+    ), "feature_long.csv")
+    distribution_data <- long[
+      as.character(long$feature_type) %in% c("numeric", "count") &
+        as.character(long$value_status) == "known" & !is.na(long$numeric_value),
+      c("feature_name", "feature_label", "feature_type", "domain_id",
+        "domain_label", "numeric_value"), drop = FALSE
+    ]
+    products$feature_summary_manifest <- products$manifest
+    products$manifest <- NULL
+    products$feature_dictionary <- dictionary[order(
+      as.integer(dictionary$feature_order)), , drop = FALSE]
+    products$distribution_data <- tibble::as_tibble(distribution_data)
+    return(list(products = products, privacy = list(
+      manifest = NULL, review = NULL, leak_audit = NULL
+    )))
+  }
   summary_dir <- fs::path(deidentified_dir, "summary")
   required <- .epi_report_required_products()
   if (!dir.exists(summary_dir) || any(!file.exists(fs::path(summary_dir, required)))) {
@@ -210,10 +264,10 @@
 }
 
 .epi_report_validate_output <- function(deidentified_dir, output_dir, output_file) {
-  protected <- c("collated", "validation", "privacy", "summary")
+  protected <- c("collated", "validation", "privacy", "summary", "features")
   protected_paths <- fs::path(deidentified_dir, protected)
   if (any(vapply(protected_paths, .epi_report_path_equal, logical(1), output_dir))) stop(
-    "Report output_dir cannot be collated/, validation/, privacy/, or summary/.",
+    "Report output_dir cannot be collated/, validation/, privacy/, summary/, or features/.",
     call. = FALSE)
   if (any(vapply(protected_paths, function(path) .epi_report_path_equal(
     path, fs::path(output_dir, output_file)), logical(1)))) stop(
@@ -222,13 +276,16 @@
 }
 
 .epi_report_manifest_row <- function(report, output_file, manifest, quarto_version) {
+  schema_version <- if (identical(report, "features"))
+    manifest$feature_summary_schema_version[[1L]] else
+    manifest$summary_schema_version[[1L]]
   tibble::tibble(
     report_schema_version = 1L,
     report_type = report,
     report_file = fs::path_file(output_file),
     form_version = as.character(manifest$form_version[[1L]]),
     profile = as.character(manifest$profile[[1L]]),
-    summary_schema_version = as.integer(manifest$summary_schema_version[[1L]]),
+    summary_schema_version = as.integer(schema_version),
     summary_status = as.character(manifest$status[[1L]]),
     n_cases = as.integer(manifest$n_cases[[1L]]),
     bcapture_version = as.character(manifest$package_version[[1L]]),
@@ -257,12 +314,13 @@
 
 #' Render a self-contained Initial Epi HTML report
 #'
-#' Reports consume the immutable summary products created by summarize_epi().
-#' They never invoke summarize_epi(), read a re-identification crosswalk, or
-#' access identifiable source products.
+#' Reports consume the immutable products created by [summarize_epi()] or, for
+#' the feature report, [summarize_epi_features()]. They never invoke either
+#' summary function, read a re-identification crosswalk, or access identifiable
+#' source products.
 #'
 #' @param deidentified_dir De-identified Initial Epi output containing summary/.
-#' @param report Report type: "summary" or "quality".
+#' @param report Report type: "summary", "quality", or "features".
 #' @param output_dir Directory for human-readable reports. Defaults to reports/.
 #' @param output_file Optional HTML basename. Defaults by report type.
 #' @param overwrite Replace the requested existing report when TRUE.
@@ -270,16 +328,20 @@
 #' @return A small list containing report status, output file, summary status,
 #'   case count, and Quarto version.
 #' @export
-render_epi_report <- function(deidentified_dir, report = c("summary", "quality"),
+render_epi_report <- function(deidentified_dir,
+                              report = c("summary", "quality", "features"),
                               output_dir = NULL, output_file = NULL,
                               overwrite = FALSE, quiet = FALSE) {
   deidentified_dir <- validate_scalar_path(deidentified_dir, "deidentified_dir")
-  report <- match.arg(report, c("summary", "quality"))
+  report <- match.arg(report, c("summary", "quality", "features"))
   if (!is.null(output_dir)) output_dir <- validate_scalar_path(output_dir, "output_dir")
   output_dir <- output_dir %||% fs::path(deidentified_dir, "reports")
   output_dir <- fs::path_norm(output_dir)
-  default_file <- if (report == "summary") "initial_epi_summary.html" else
-    "initial_epi_quality.html"
+  default_file <- switch(report,
+    summary = "initial_epi_summary.html",
+    quality = "initial_epi_quality.html",
+    features = "initial_epi_features.html"
+  )
   if (is.null(output_file)) output_file <- default_file
   output_file <- validate_scalar_path(output_file, "output_file")
   if (!identical(fs::path_file(output_file), output_file) ||
@@ -290,8 +352,11 @@ render_epi_report <- function(deidentified_dir, report = c("summary", "quality")
   if (file.exists(target) && !isTRUE(overwrite)) stop(
     "Report output already exists; use overwrite = TRUE to replace it.", call. = FALSE)
   quarto <- .epi_report_find_quarto()
-  template_name <- if (report == "summary") "initial-epi-summary.qmd" else
-    "initial-epi-quality.qmd"
+  template_name <- switch(report,
+    summary = "initial-epi-summary.qmd",
+    quality = "initial-epi-quality.qmd",
+    features = "initial-epi-features.qmd"
+  )
   template <- system.file("quarto", template_name, package = "bcapture")
   if (!nzchar(template) || !file.exists(template)) stop(
     "Installed Quarto report template is missing: ", template_name, call. = FALSE)
@@ -299,7 +364,8 @@ render_epi_report <- function(deidentified_dir, report = c("summary", "quality")
     "ggplot2 is required to render bcapture HTML reports.", call. = FALSE)
 
   input <- .epi_report_read_products(deidentified_dir, report)
-  manifest <- input$products$summary_manifest
+  manifest <- if (report == "features") input$products$feature_summary_manifest else
+    input$products$summary_manifest
   safe_data <- c(input$products, list(
     privacy = .epi_report_safe_privacy(input$privacy),
     report = report
@@ -321,8 +387,11 @@ render_epi_report <- function(deidentified_dir, report = c("summary", "quality")
   if (!file.copy(template_assets, fs::path(staged_assets, "epi-report.css"), overwrite = TRUE)) stop(
     "Unable to stage the Quarto report stylesheet.", call. = FALSE)
   generated_at <- utc_now()
-  title <- if (report == "summary") "Initial Epi Descriptive Summary" else
-    "Initial Epi Data Quality Review"
+  title <- switch(report,
+    summary = "Initial Epi Descriptive Summary",
+    quality = "Initial Epi Data Quality Review",
+    features = "Initial Epi Analytical Feature Review"
+  )
   writeLines(c(
     paste0("data_file: ", .epi_report_yaml_value(data_file)),
     if (file.exists(fs::path(fs::path_dir(template), "..", "..", "R", "plot-epi.R")))

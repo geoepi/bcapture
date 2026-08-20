@@ -12,7 +12,16 @@ utils::globalVariables(c(
   "question_id", "subquestion_id", "field_role", "response_type", "raw_value", "value",
   "response_code", "response_label", "units", "n_rows", "status", "mapping_count",
   "mapped", "unknown_field_names", "raw_fields", "mapped_fields", "unknown_fields",
-  "populated_fields", "populated_mapped_fields", "populated_unmapped_fields"
+  "populated_fields", "populated_mapped_fields", "populated_unmapped_fields",
+  "display_item", "display_label", "display_percent", "display_response",
+  "display_rule", "display_table", "item_code", "item_label", "label",
+  "max_records_per_case", "median", "median_records_per_case", "n_cases",
+  "n_findings", "q25", "q75", "response_order", "scope",
+  "validation_status", "finding_type", "feature_name", "feature_label",
+  "domain_id", "domain_label", "case_id", "summary_level",
+  "display_category", "display_domain", "display_feature", "display_finding",
+  "numeric_value", "percent_known_cells", "percent_missing",
+  "percent_of_known", "percent_true_of_known"
 ))
 
 schema_hash_from_fields <- function(fields) {
