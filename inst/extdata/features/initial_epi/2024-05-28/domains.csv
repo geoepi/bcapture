@@ -1,0 +1,10 @@
+domain_id,domain_label,domain_order,description
+flock_clinical,Flock and clinical,1,Structured flock inventory clinical mortality egg production and AI testing observations.
+mortality_disposal,Mortality disposal,2,Structured observations about carcass-bin practices and recorded mortality-disposal methods.
+manure_materials,Manure and imported materials,3,Structured observations about manure movement destinations and imported animal or material records.
+personnel_contact,Personnel and visitor contact,4,Structured observations about worker crew and visitor activity recorded by the questionnaire.
+shared_equipment,Shared equipment,5,Structured observations about within-premises equipment movement and shared-equipment records.
+bird_movement,Bird movement,6,Structured observations about bird movements onto or off the premises and related records.
+egg_movement,Egg movement,7,Structured observations about egg and egg-product movements and related records.
+environment_wildlife,Environment and wildlife,8,Structured observations about outdoor access wildlife water and wildlife-management context.
+management_veterinary,Management and veterinary,9,Structured observations about veterinarian availability and depopulation planning.
