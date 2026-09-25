@@ -44,6 +44,15 @@ assign_schema_groups <- function(hashes) {
   unname(groups[as.character(hashes)])
 }
 
+schema_identity_from_table <- function(x) {
+  actual <- if ("form_schema_hash" %in% names(x)) as.character(x$form_schema_hash) else rep(NA_character_, nrow(x))
+  canonical <- if ("canonical_template_schema_hash" %in% names(x)) as.character(x$canonical_template_schema_hash) else rep(NA_character_, nrow(x))
+  method <- if ("extraction_method" %in% names(x)) as.character(x$extraction_method) else rep(NA_character_, nrow(x))
+  spatial <- method == "spatial_template" & !is.na(canonical) & nzchar(canonical)
+  actual[spatial] <- canonical[spatial]
+  actual
+}
+
 schema_difference_counts <- function(diagnostic) {
   list(
     schemas = nrow(diagnostic$schema_groups),

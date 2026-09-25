@@ -3,16 +3,17 @@
 #' Extracts structured AcroForm field values from completed HPAI Biosecurity
 #' Compliance Audit Program PDF forms.
 #'
-#' @param pdf_file Path to one electronically populated PDF form.
+#' @param pdf_file Path to one interactive or recognized flattened PDF form.
 #' @param out_dir Directory in which the `audits/` output directory is created.
 #' @param overwrite Whether to replace this audit's existing output directory.
 #' @param quiet Suppress progress messages.
 #' @return A named list with `audit_id`, `status`, field tables, metadata, and
 #'   `output_dir`. The result has class `bcapture_extraction`.
 #' @details Python and the `pypdf` package are required and are initialized
-#'   lazily only when this function is invoked. Flattened or scanned PDFs with
-#'   no AcroForm fields fail with `failure_type = "no_acroform_fields"` in a
-#'   batch manifest; OCR and handwriting extraction are not implemented.
+#'   lazily only when this function is invoked. Interactive AcroForm fields are
+#'   preferred. Recognized selectable-text flattened PDFs use the versioned
+#'   spatial template; scanned, OCR-only, handwritten, and unrecognized
+#'   flattened PDFs fail explicitly.
 #' @export
 extract_hpai_file <- function(pdf_file, out_dir, overwrite = FALSE, quiet = FALSE) {
   pdf_file <- validate_scalar_path(pdf_file, "pdf_file")
@@ -42,10 +43,12 @@ extract_hpai_file <- function(pdf_file, out_dir, overwrite = FALSE, quiet = FALS
 #' @param quiet Suppress progress messages.
 #' @return Invisibly, a tibble with one extraction-manifest row per input PDF.
 #' @details Python and the `pypdf` package are required and initialized lazily.
-#'   Only interactive AcroForm PDFs are supported. Flattened or scanned PDFs
-#'   are recorded as failures and do not generate empty successful records.
-#'   One failed PDF does not stop the remaining batch. The output directory is
-#'   rebuilt from successful extractions in the current invocation.
+#'   Recognized selectable-text flattened PDFs are reconstructed with the
+#'   versioned spatial template. Scanned, OCR-only, handwritten, and
+#'   unrecognized flattened PDFs are recorded as failures and do not generate
+#'   empty successful records. One failed PDF does not stop the remaining
+#'   batch. The output directory is rebuilt from successful extractions in the
+#'   current invocation.
 #' @examples
 #' \dontrun{
 #' result <- extract_hpai("completed_audits", "bcapture_output")
@@ -80,7 +83,7 @@ extract_hpai <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, 
   }, character(1))
   results <- purrr::map2(pdfs, source_relpaths, ~ .extract_hpai_file_impl(.x, out_dir, .y, overwrite, quiet))
   manifest <- dplyr::bind_rows(purrr::map(results, `[[`, "manifest"))
-  manifest$schema_group <- assign_schema_groups(manifest$form_schema_hash)
+  manifest$schema_group <- assign_schema_groups(schema_identity_from_table(manifest))
   results <- purrr::map(results, function(result) {
     if (identical(result$status, "success")) {
       group <- manifest$schema_group[match(result$audit_id, manifest$audit_id)]
@@ -110,11 +113,29 @@ extract_hpai <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, 
   audit_id <- sanitize_audit_id(fs::path_ext_remove(source_file))
   source_md5 <- source_checksum(pdf_file)
   extracted_at <- utc_now()
-  base_manifest <- list(audit_id = audit_id, form_type = "bcap", source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, status = "failed", failure_type = NA_character_, error = NA_character_, number_of_pages = NA_integer_, number_of_fields = NA_integer_, number_of_widgets = NA_integer_, number_of_populated_fields = NA_integer_, form_schema_hash = NA_character_, schema_group = NA_character_, extraction_method = "acroform", pypdf_version = NA_character_, extracted_at_utc = extracted_at)
+  base_manifest <- list(audit_id = audit_id, form_type = "bcap", source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, status = "failed", failure_type = NA_character_, error = NA_character_, number_of_pages = NA_integer_, number_of_fields = NA_integer_, number_of_widgets = NA_integer_, number_of_source_widgets = NA_integer_, number_of_canonical_fields = NA_integer_, number_of_canonical_widgets = NA_integer_, number_of_populated_fields = NA_integer_, form_schema_hash = NA_character_, source_form_schema_hash = NA_character_, canonical_template_schema_hash = NA_character_, schema_identity = NA_character_, schema_group = NA_character_, extraction_method = "acroform", extraction_status = NA_character_, template_family = NA_character_, template_version = NA_character_, registration_method = NA_character_, registration_quality = NA_character_, registration_residual_pt = NA_real_, anchor_fraction = NA_real_, control_threshold = NA_real_, pypdf_version = NA_character_, extracted_at_utc = extracted_at)
   tryCatch({
     module <- ensure_hpai_python()
     parsed <- reticulate::py_to_r(module$extract_form(pdf_file))
-    if (!isTRUE(parsed$has_acroform_fields)) stop("No AcroForm fields were detected in the PDF.", call. = FALSE)
+    if (!isTRUE(parsed$has_acroform_fields)) {
+      spatial_parsed <- extract_spatial_pdf(pdf_file, "bcap")
+      tables <- spatial_result_tables(
+        spatial_parsed, audit_id, "bcap", source_file, source_relpath,
+        source_md5, "audit_id", "source_md5", epi = FALSE
+      )
+      paths <- audit_output_paths(audit_id, out_dir)
+      if (dir.exists(paths$dir) && isTRUE(overwrite)) unlink(paths$dir, recursive = TRUE, force = TRUE)
+      if (dir.exists(paths$dir)) stop("Output directory already exists.", call. = FALSE)
+      write_spatial_outputs(tables, paths)
+      manifest <- spatial_manifest_values(
+        spatial_parsed, audit_id, "bcap", source_file, source_relpath,
+        source_md5, "audit_id", "source_md5"
+      )
+      return(list(audit_id = audit_id, status = "success", fields = tables$fields,
+        populated_fields = tables$populated_fields, wide = tables$wide,
+        metadata = tables$metadata, widgets = tables$widgets,
+        output_dir = paths$dir, manifest = manifest))
+    }
     fields <- field_rows_to_tibble(parsed$fields)
     fields <- dplyr::mutate(fields, audit_id = audit_id, source_file = source_file, source_relpath = as.character(source_relpath), source_md5 = source_md5, .before = 1)
     widgets <- widget_rows_to_tibble(parsed$widgets)
@@ -144,6 +165,7 @@ extract_hpai <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, 
     list(audit_id = audit_id, status = "success", fields = fields, populated_fields = populated, wide = wide, metadata = metadata, widgets = widgets, output_dir = paths$dir, manifest = as_single_row_tibble(manifest))
   }, error = function(error) {
     manifest <- base_manifest
+    if (exists("parsed", inherits = FALSE) && !isTRUE(parsed$has_acroform_fields)) manifest$extraction_method <- "spatial_template"
     manifest$failure_type <- failure_type_from_error(error)
     manifest$error <- conditionMessage(error)
     if (!quiet) cli::cli_alert_warning("{source_file}: {manifest$failure_type}")

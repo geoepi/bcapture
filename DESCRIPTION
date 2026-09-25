@@ -10,7 +10,8 @@ Description: Extracts structured data from Biosecurity Compliance Audit Program
     PDF forms and provides infrastructure for organizing, validating,
     summarizing, and eventually viewing audit results. The current extractor
     supports electronically completed HPAI forms with interactive AcroForm
-    fields; scanned and handwritten forms are not supported yet.
+    fields and versioned selectable-text flattened templates; scanned and
+    handwritten forms are not supported yet.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

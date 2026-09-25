@@ -32,3 +32,9 @@ Invisibly, an extraction manifest.
 \description{
 Extract Initial Epidemiological Interview PDFs
 }
+\details{
+Interactive AcroForm fields are preferred. Recognized flattened
+selectable-text PDFs use the versioned spatial template for this form
+family; mixed batches retain route-specific provenance. Scanned, OCR-only,
+handwritten, and unrecognized flattened PDFs remain failures.
+}

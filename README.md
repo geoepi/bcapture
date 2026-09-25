@@ -8,8 +8,8 @@
 `bcapture` provides tools for extracting, organizing, validating, summarizing,
 and viewing data from Biosecurity Compliance Audit Program (bCAP) forms.
 
-The current development version focuses on structured extraction from
-electronically completed HPAI BCAP PDF forms. See the package documentation
+The current development version focuses on structured extraction from HPAI
+BCAP and Initial Epi PDF forms. See the package documentation
 and [the output contract](docs/output-structure.md) for details.
 
 ## Purpose
@@ -29,9 +29,11 @@ only when an extraction function is called.
 
 ## Python dependency
 
-Extraction requires Python and the `pypdf` package. `bcapture` requests
-`pypdf` lazily through reticulate and does not initialize Python when the
-package is loaded. No Python pandas dependency is used.
+Extraction requires Python and the `pypdf` package. Recognized selectable-text
+flattened PDFs additionally use `pdfplumber` and `pypdfium2` for spatial text
+and rendered-control evidence. `bcapture` requests these packages lazily
+through reticulate and does not initialize Python when the package is loaded.
+No Python pandas dependency is used.
 
 ## Quick start
 
@@ -133,8 +135,11 @@ For complete synthetic user workflows, see the
 - [Initial Epi visualization](docs/tutorials/initial-epi-visualization.md)
 - [Initial Epi HTML reporting](docs/tutorials/initial-epi-reporting.md)
 
-The current extractor reads interactive PDF form fields directly. It does not
-use OCR and does not yet extract handwritten values from scanned forms.
+The extractor reads interactive PDF form fields directly when available. For
+the packaged, versioned Initial Epi and BCAP templates, it can also reconstruct
+selectable-text flattened PDFs using page geometry, baseline subtraction, and
+rendered control-mark comparison. OCR, handwriting recognition, and arbitrary
+unrecognized flattened layouts remain unsupported.
 
 ## Output structure
 
@@ -182,12 +187,33 @@ logical-field presence, field-type, response-state, field-order, and widget
 encoding differences. PDF widget serialization can vary even when forms look
 identical, so no automatic semantic reconciliation is performed.
 
+## Flattened selectable-text PDFs
+
+The spatial fallback is deliberately template-guided rather than a general
+PDF or OCR parser. Each supported family has an immutable canonical
+interactive/printed pair and derived field, widget, page-geometry, and
+registration metadata under `inst/extdata/templates/`. A successful spatial
+record has `extraction_method = "spatial_template"` in metadata and
+`spatial_text`/`spatial_mark` at field level. Its observed `form_schema_hash`
+is `NA`; `canonical_template_schema_hash` identifies the versioned logical
+schema, and `number_of_source_widgets` is zero because flattened PDFs no
+longer contain source widgets. Registration quality, anchor agreement, field
+regions, and evidence classes are retained for auditability.
+
+The fallback rejects page-count or layout mismatches, image-only inputs, and
+ambiguous control states. Mixed batches can contain AcroForm and spatial
+records; diagnostics use the canonical template hash as the schema identity
+for spatial records so they remain comparable without inventing an observed
+AcroForm hash.
+
 ## Failure handling
 
 Batch extraction performs preflight checks for input files, sanitized audit-ID
 collisions, and existing output directories before writing. A failed PDF does
 not stop the batch; it receives a `failed` manifest row with a useful failure
-type. Flattened or scanned forms are recorded as `no_acroform_fields`.
+type. Scanned, OCR-only, and unrecognized flattened forms are recorded with a
+classified failure such as `no_usable_digital_content`,
+`unrecognized_flattened_form`, or `registration_failed`.
 
 ## Current limitations
 

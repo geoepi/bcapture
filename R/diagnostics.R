@@ -29,7 +29,8 @@ diagnose_acroform_batch <- function(out_dir, id_col = "audit_id", form_label = "
   fields$states_normalized <- vapply(fields$states, state_set_to_string, character(1))
   audit_ids <- sort(unique(fields$audit_id))
   metadata <- .complete_diagnostic_metadata(metadata, fields, audit_ids)
-  metadata$schema_group <- assign_schema_groups(metadata$form_schema_hash)
+  metadata$schema_identity <- schema_identity_from_table(metadata)
+  metadata$schema_group <- assign_schema_groups(metadata$schema_identity)
   fields <- dplyr::left_join(fields, metadata[, c("audit_id", "schema_group")], by = "audit_id")
   if (nrow(widgets) > 0L) {
     widgets$field_type <- sub("^/", "", widgets$field_type)
@@ -147,8 +148,12 @@ diagnose_acroform_batch <- function(out_dir, id_col = "audit_id", form_label = "
     metadata <- fallback
   }
   if (!"form_schema_hash" %in% names(metadata)) metadata$form_schema_hash <- NA_character_
-  if (anyNA(metadata$form_schema_hash)) {
-    for (audit_id in metadata$audit_id[is.na(metadata$form_schema_hash)]) {
+  if (!"canonical_template_schema_hash" %in% names(metadata)) metadata$canonical_template_schema_hash <- NA_character_
+  if (!"extraction_method" %in% names(metadata)) metadata$extraction_method <- "acroform"
+  spatial <- metadata$extraction_method == "spatial_template"
+  fill_ids <- metadata$audit_id[is.na(metadata$form_schema_hash) & !spatial]
+  if (length(fill_ids) > 0L) {
+    for (audit_id in fill_ids) {
       audit_fields <- fields[fields$audit_id == audit_id, , drop = FALSE]
       metadata$form_schema_hash[metadata$audit_id == audit_id] <- tryCatch(
         schema_hash_from_fields(audit_fields),
@@ -158,6 +163,7 @@ diagnose_acroform_batch <- function(out_dir, id_col = "audit_id", form_label = "
   }
   if (!"number_of_widgets" %in% names(metadata)) metadata$number_of_widgets <- NA_integer_
   if (!"schema_group" %in% names(metadata)) metadata$schema_group <- NA_character_
+  metadata$schema_identity <- schema_identity_from_table(metadata)
   metadata[match(audit_ids, metadata$audit_id), , drop = FALSE]
 }
 
@@ -166,22 +172,34 @@ diagnose_acroform_batch <- function(out_dir, id_col = "audit_id", form_label = "
     dplyr::group_by(audit_id) |>
     dplyr::summarise(number_of_field_types = dplyr::n_distinct(field_type), .groups = "drop")
   dplyr::left_join(metadata, type_counts, by = "audit_id") |>
-    dplyr::select(audit_id, source_file, schema_group, form_schema_hash,
-      number_of_fields, number_of_widgets, number_of_populated_fields,
-      number_of_field_types)
+    dplyr::select(dplyr::all_of(c(
+      "audit_id", "source_file", "schema_group", "form_schema_hash",
+      "canonical_template_schema_hash", "schema_identity", "extraction_method",
+      "number_of_fields", "number_of_widgets", "number_of_populated_fields",
+      "number_of_field_types"
+    )))
 }
 
 .schema_groups <- function(summary) {
-  summary |>
-    dplyr::group_by(schema_group, form_schema_hash) |>
-    dplyr::summarise(
-      number_of_audits = dplyr::n(),
-      audit_ids = paste(sort(audit_id), collapse = "|"),
-      number_of_fields = dplyr::first(number_of_fields),
-      number_of_field_types = dplyr::first(number_of_field_types),
-      .groups = "drop"
-    ) |>
-    dplyr::arrange(schema_group)
+  key <- paste(
+    ifelse(is.na(summary$schema_group), "<NA>", summary$schema_group),
+    ifelse(is.na(summary$schema_identity), "<NA>", summary$schema_identity),
+    sep = "\r"
+  )
+  groups <- split(summary, key, drop = TRUE)
+  result <- purrr::map_dfr(groups, function(group) {
+    tibble::tibble(
+      schema_group = group$schema_group[[1L]],
+      schema_identity = group$schema_identity[[1L]],
+      number_of_audits = nrow(group),
+      audit_ids = paste(sort(group$audit_id), collapse = "|"),
+      form_schema_hash = paste(sort(unique(stats::na.omit(group$form_schema_hash))), collapse = "|"),
+      canonical_template_schema_hash = paste(sort(unique(stats::na.omit(group$canonical_template_schema_hash))), collapse = "|"),
+      number_of_fields = group$number_of_fields[[1L]],
+      number_of_field_types = group$number_of_field_types[[1L]]
+    )
+  })
+  result[order(result$schema_group, na.last = TRUE), , drop = FALSE]
 }
 
 .field_presence <- function(fields, audit_ids) {

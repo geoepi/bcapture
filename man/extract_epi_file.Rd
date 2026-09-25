@@ -7,7 +7,8 @@
 extract_epi_file(pdf_file, out_dir, overwrite = FALSE, quiet = FALSE)
 }
 \arguments{
-\item{pdf_file}{Path to one interactive Initial Epi Interview PDF.}
+\item{pdf_file}{Path to one interactive or recognized flattened Initial Epi
+Interview PDF.}
 
 \item{out_dir}{Directory in which the \verb{forms/} output directory is created.}
 
@@ -20,4 +21,10 @@ A named extraction result.
 }
 \description{
 Extract one Initial Epidemiological Interview PDF
+}
+\details{
+Interactive AcroForm fields are preferred. A versioned,
+selectable-text flattened PDF is reconstructed against the packaged
+canonical template when no AcroForm fields are present. Scanned, OCR-only,
+handwritten, and unrecognized flattened PDFs fail explicitly.
 }

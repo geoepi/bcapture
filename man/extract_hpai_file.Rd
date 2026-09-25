@@ -7,7 +7,7 @@
 extract_hpai_file(pdf_file, out_dir, overwrite = FALSE, quiet = FALSE)
 }
 \arguments{
-\item{pdf_file}{Path to one electronically populated PDF form.}
+\item{pdf_file}{Path to one interactive or recognized flattened PDF form.}
 
 \item{out_dir}{Directory in which the \verb{audits/} output directory is created.}
 
@@ -25,7 +25,8 @@ Compliance Audit Program PDF forms.
 }
 \details{
 Python and the \code{pypdf} package are required and are initialized
-lazily only when this function is invoked. Flattened or scanned PDFs with
-no AcroForm fields fail with \code{failure_type = "no_acroform_fields"} in a
-batch manifest; OCR and handwriting extraction are not implemented.
+lazily only when this function is invoked. Interactive AcroForm fields are
+preferred. Recognized selectable-text flattened PDFs use the versioned
+spatial template; scanned, OCR-only, handwritten, and unrecognized
+flattened PDFs fail explicitly.
 }

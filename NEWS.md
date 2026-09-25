@@ -1,5 +1,10 @@
 # bcapture 0.0.0.9000
 
+* Added versioned template-guided extraction for selectable-text flattened
+  Initial Epi and BCAP PDFs, with page-registration provenance, rendered
+  control-mark evidence, explicit failure classes, and mixed-batch route
+  diagnostics. OCR and handwriting remain unsupported.
+
 * Added descriptive summaries, visualization, and self-contained Quarto HTML reporting for Initial Epi analytical features.
 
 * Added a versioned, privacy-gated, auditable case-level Initial Epi feature

@@ -67,11 +67,16 @@ epi_combined_output_paths <- function(out_dir) {
 
 #' Extract one Initial Epidemiological Interview PDF
 #'
-#' @param pdf_file Path to one interactive Initial Epi Interview PDF.
+#' @param pdf_file Path to one interactive or recognized flattened Initial Epi
+#'   Interview PDF.
 #' @param out_dir Directory in which the `forms/` output directory is created.
 #' @param overwrite Whether to replace this form's existing output directory.
 #' @param quiet Suppress progress messages.
 #' @return A named extraction result.
+#' @details Interactive AcroForm fields are preferred. A versioned,
+#'   selectable-text flattened PDF is reconstructed against the packaged
+#'   canonical template when no AcroForm fields are present. Scanned, OCR-only,
+#'   handwritten, and unrecognized flattened PDFs fail explicitly.
 #' @export
 extract_epi_file <- function(pdf_file, out_dir, overwrite = FALSE, quiet = FALSE) {
   pdf_file <- validate_scalar_path(pdf_file, "pdf_file")
@@ -96,6 +101,10 @@ extract_epi_file <- function(pdf_file, out_dir, overwrite = FALSE, quiet = FALSE
 #' @param diagnostics Automatically write normalized schema diagnostics.
 #' @param quiet Suppress progress messages.
 #' @return Invisibly, an extraction manifest.
+#' @details Interactive AcroForm fields are preferred. Recognized flattened
+#'   selectable-text PDFs use the versioned spatial template for this form
+#'   family; mixed batches retain route-specific provenance. Scanned, OCR-only,
+#'   handwritten, and unrecognized flattened PDFs remain failures.
 #' @export
 extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, diagnostics = TRUE, quiet = FALSE) {
   in_dir <- validate_scalar_path(in_dir, "in_dir")
@@ -120,7 +129,7 @@ extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, d
   if (!quiet) cli::cli_inform("Extracting {length(pdfs)} Initial Epi PDF{?s}.")
   results <- purrr::map2(pdfs, source_relpaths, ~ .extract_epi_file_impl(.x, out_dir, .y, overwrite, quiet))
   manifest <- dplyr::bind_rows(purrr::map(results, `[[`, "manifest"))
-  manifest$schema_group <- assign_schema_groups(manifest$form_schema_hash)
+  manifest$schema_group <- assign_schema_groups(schema_identity_from_table(manifest))
   results <- purrr::map(results, function(result) {
     if (identical(result$status, "success")) {
       group <- manifest$schema_group[match(result$form_id, manifest$form_id)]
@@ -156,11 +165,29 @@ extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, d
   form_id <- sanitize_form_id(fs::path_ext_remove(source_file))
   source_hash <- source_sha256(pdf_file)
   extracted_at <- utc_now()
-  base_manifest <- list(form_id = form_id, form_type = "initial_epi", source_file = source_file, source_relpath = as.character(source_relpath), source_sha256 = source_hash, status = "failed", failure_type = NA_character_, error = NA_character_, number_of_pages = NA_integer_, number_of_fields = NA_integer_, number_of_widgets = NA_integer_, number_of_populated_fields = NA_integer_, form_schema_hash = NA_character_, schema_group = NA_character_, extraction_method = "acroform", pypdf_version = NA_character_, extracted_at_utc = extracted_at)
+  base_manifest <- list(form_id = form_id, form_type = "initial_epi", source_file = source_file, source_relpath = as.character(source_relpath), source_sha256 = source_hash, status = "failed", failure_type = NA_character_, error = NA_character_, number_of_pages = NA_integer_, number_of_fields = NA_integer_, number_of_widgets = NA_integer_, number_of_source_widgets = NA_integer_, number_of_canonical_fields = NA_integer_, number_of_canonical_widgets = NA_integer_, number_of_populated_fields = NA_integer_, form_schema_hash = NA_character_, source_form_schema_hash = NA_character_, canonical_template_schema_hash = NA_character_, schema_identity = NA_character_, schema_group = NA_character_, extraction_method = "acroform", extraction_status = NA_character_, template_family = NA_character_, template_version = NA_character_, registration_method = NA_character_, registration_quality = NA_character_, registration_residual_pt = NA_real_, anchor_fraction = NA_real_, control_threshold = NA_real_, pypdf_version = NA_character_, extracted_at_utc = extracted_at)
   tryCatch({
     module <- ensure_acroform_python()
     parsed <- reticulate::py_to_r(module$extract_form(pdf_file))
-    if (!isTRUE(parsed$has_acroform_fields)) stop("No AcroForm fields were detected in the PDF.", call. = FALSE)
+    if (!isTRUE(parsed$has_acroform_fields)) {
+      spatial_parsed <- extract_spatial_pdf(pdf_file, "initial_epi")
+      tables <- spatial_result_tables(
+        spatial_parsed, form_id, "initial_epi", source_file, source_relpath,
+        source_hash, "form_id", "source_sha256", epi = TRUE
+      )
+      paths <- epi_output_paths(form_id, out_dir)
+      if (dir.exists(paths$dir) && isTRUE(overwrite)) unlink(paths$dir, recursive = TRUE, force = TRUE)
+      if (dir.exists(paths$dir)) stop("Output directory already exists.", call. = FALSE)
+      write_spatial_outputs(tables, paths)
+      manifest <- spatial_manifest_values(
+        spatial_parsed, form_id, "initial_epi", source_file, source_relpath,
+        source_hash, "form_id", "source_sha256"
+      )
+      return(list(form_id = form_id, status = "success", fields = tables$fields,
+        populated_fields = tables$populated_fields, wide = tables$wide,
+        metadata = tables$metadata, widgets = tables$widgets,
+        output_dir = paths$dir, manifest = manifest))
+    }
     fields <- .epi_fields(field_rows_to_tibble(parsed$fields))
     validate_epi_signature(fields, warn_optional = FALSE)
     fields <- dplyr::mutate(fields, form_id = form_id, form_type = "initial_epi", source_file = source_file, source_relpath = as.character(source_relpath), source_sha256 = source_hash, .before = 1)
@@ -192,6 +219,7 @@ extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, d
     list(form_id = form_id, status = "success", fields = fields, populated_fields = populated, wide = wide, metadata = metadata, widgets = widgets, output_dir = paths$dir, manifest = as_single_row_tibble(manifest))
   }, error = function(error) {
     manifest <- base_manifest
+    if (exists("parsed", inherits = FALSE) && !isTRUE(parsed$has_acroform_fields)) manifest$extraction_method <- "spatial_template"
     manifest$failure_type <- failure_type_from_error(error)
     manifest$error <- conditionMessage(error)
     if (!quiet) cli::cli_alert_warning("{source_file}: {manifest$failure_type}")

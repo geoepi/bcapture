@@ -55,27 +55,33 @@ row, begins with provenance columns `audit_id`, `source_file`,
 `source_relpath`, `source_md5`, and `form_schema_hash`, and then uses the PDF
 field names as columns without unnecessary semantic recoding.
 
-`extraction_method` is currently `acroform`. Future extraction modes can use
-`ocr`, `handwriting`, or `manual_review` without changing the core table.
+`extraction_method` is `acroform` for interactive documents. Recognized
+flattened documents use `spatial_template` in metadata/manifests and
+`spatial_text` or `spatial_mark` at field level. OCR, handwriting, and manual
+review are not silently substituted.
 
-`number_of_fields` always counts logical fields returned by
-`pypdf.PdfReader.get_fields()`. `number_of_widgets` counts `/Widget`
-annotations encountered across pages. A logical field may have multiple
-widgets, especially for radio/button controls. The widget table is a
-diagnostic representation and is not the canonical analytical extraction.
+For AcroForms, `number_of_fields` counts logical fields returned by
+`pypdf.PdfReader.get_fields()` and `number_of_widgets` counts `/Widget`
+annotations encountered across pages. For spatial records, these are the
+canonical template counts; `number_of_source_widgets` is zero and the widget
+table is empty because the flattened source has no AcroForm annotations. A
+logical canonical field may have multiple widgets, especially for
+radio/button controls.
 
 Field types use the normalized convention `Btn`, `Tx`, `Ch`, and `Sig`.
 
 ## Metadata and manifest
 
 `metadata` has one row per successful PDF with page, field, population, schema,
-checksum, method, pypdf version, and UTC extraction time. Available PDF
+checksum, method, template/registration provenance, pypdf version, and UTC extraction time. Available PDF
 metadata fields are appended with a `pdf_` prefix.
 
 `extraction_manifest.csv` has one row for every input PDF, whether successful
 or failed. A failure has `status = failed` and a useful `failure_type`, such as
-`no_acroform_fields` or `pdf_read_error`; it does not create an empty success
-record. The manifest includes the same provenance fields and extraction counts.
+`no_usable_digital_content`, `unrecognized_flattened_form`,
+`registration_failed`, or `pdf_read_error`; it does not create an empty
+success record. The manifest includes the same provenance fields and
+extraction counts.
 
 ## Combined products, schema hashes, and diagnostics
 
@@ -85,7 +91,9 @@ of the logical field name, normalized field type, and normalized valid state set
 Fields are sorted by name and states are deduplicated and sorted before hashing;
 field order, page position, current values, and populated status do not affect
 the hash. `schema_group` assigns deterministic human-readable labels such as
-`schema_001` within a batch.
+`schema_001` within a batch. Spatial records use
+`canonical_template_schema_hash` as `schema_identity`; their observed
+`form_schema_hash` remains missing rather than implying AcroForm structure.
 
 `diagnostics/` contains differences rather than another complete extraction.
 It compares field presence, field types, normalized state sets, field ordering,

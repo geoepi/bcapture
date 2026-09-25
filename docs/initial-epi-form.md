@@ -19,9 +19,11 @@ choice defaults and known prompts such as `Select or Type` and `Select (Ctrl
 for multi)` are preserved in the canonical long table, but are excluded from
 populated-only products.
 
-Only interactive AcroForm PDFs are supported. Scanned and handwritten forms
-remain `no_acroform_fields`; OCR and handwriting recognition are not part of
-this implementation.
+Interactive AcroForm PDFs are preferred. The versioned May 28, 2024 template
+also supports selectable-text flattened PDFs through a spatial fallback that
+uses page registration, blank-template subtraction, and rendered control-mark
+comparison. Scanned, OCR-only, handwritten, and unrecognized flattened forms
+remain unsupported and fail with an explicit classified failure.
 
 Repeated fields retain their original logical names in raw extraction. The
 versioned dictionary and `collate_epi()` layer interprets them as house,
