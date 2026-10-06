@@ -243,11 +243,24 @@
   sprintf("%s-%06d", prefix, .epi_deid_case_prefix(prefix, existing) + 1L)
 }
 
-.epi_deid_add_sensitive <- function(state, value, scope = NULL) {
+.epi_deid_sensitive_scope_key <- function(scope, raw_field = NULL) {
+  if (is.null(scope) || length(scope) == 0L || is.na(scope[[1L]]) || !nzchar(trimws(as.character(scope[[1L]])))) {
+    return(NULL)
+  }
+  scope <- as.character(scope[[1L]])
+  if (is.null(raw_field) || length(raw_field) == 0L || is.na(raw_field[[1L]]) ||
+      !nzchar(trimws(as.character(raw_field[[1L]])))) return(scope)
+  paste(scope, as.character(raw_field[[1L]]), sep = "\r")
+}
+
+.epi_deid_add_sensitive <- function(state, value, scope = NULL, raw_field = NULL) {
   value <- as.character(value)
   value <- value[!is.na(value) & nzchar(trimws(value))]
   if (length(value) == 0L) return(invisible(NULL))
-  if (is.null(scope)) state$sensitive_values <- unique(c(state$sensitive_values, value)) else state$sensitive_context[[scope]] <- unique(c(state$sensitive_context[[scope]], value))
+  key <- .epi_deid_sensitive_scope_key(scope, raw_field)
+  if (is.null(key)) state$sensitive_values <- unique(c(state$sensitive_values, value)) else {
+    state$sensitive_context[[key]] <- unique(c(state$sensitive_context[[key]], value))
+  }
   invisible(NULL)
 }
 
@@ -290,7 +303,7 @@
   pseudonym
 }
 
-.epi_deid_transform <- function(state, value, rule, case_id, table_name, column_name, raw_field, record_event = TRUE) {
+.epi_deid_transform <- function(state, value, rule, case_id, table_name, column_name, raw_field, record_event = TRUE, sensitive_raw_field = NULL) {
   if (is.null(rule)) stop("Privacy policy lookup failed for an emitted source-value column.", call. = FALSE)
   if (length(value) == 0L || is.na(value[[1L]]) || !nzchar(trimws(as.character(value[[1L]])))) return(.epi_deid_missing_like(value))
   action <- as.character(rule$action[[1L]])
@@ -302,7 +315,7 @@
     }
     output <- .epi_deid_entity(state, value, as.character(rule$pseudonym_class[[1L]]), case_id, raw_field, table_name)
   } else stop("Privacy policy action is not implemented.", call. = FALSE)
-  if (action != "retain") .epi_deid_add_sensitive(state, value, paste(table_name, column_name, sep = "\r"))
+  if (action != "retain") .epi_deid_add_sensitive(state, value, paste(table_name, column_name, sep = "\r"), sensitive_raw_field)
   if (isTRUE(record_event)) .epi_deid_event(state, table_name, column_name, rule, value, output, case_id, raw_field)
   output
 }
@@ -409,15 +422,15 @@
     if (is.null(rule)) stop("Privacy policy is missing a semantic long-table field rule.", call. = FALSE)
     raw <- responses$raw_value[[i]]
     if (identical(as.character(rule$pseudonym_class[[1L]]), "premises")) {
-      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "raw_value", sep = "\r"))
+      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "raw_value", sep = "\r"), responses$raw_field[[i]])
       transformed <- .epi_deid_premises_value(raw, records, responses$case_id[[i]])
-    } else transformed <- .epi_deid_transform(state, raw, rule, responses$case_id[[i]], "epi_responses_long", "raw_value", responses$raw_field[[i]])
+    } else transformed <- .epi_deid_transform(state, raw, rule, responses$case_id[[i]], "epi_responses_long", "raw_value", responses$raw_field[[i]], sensitive_raw_field = responses$raw_field[[i]])
     responses$raw_value[[i]] <- transformed
     responses$value[[i]] <- if (identical(as.character(rule$action[[1L]]), "retain")) responses$value[[i]] else transformed
     if (!identical(as.character(rule$action[[1L]]), "retain")) {
       responses$response_label[[i]] <- transformed
-      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "value", sep = "\r"))
-      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "response_label", sep = "\r"))
+      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "value", sep = "\r"), responses$raw_field[[i]])
+      .epi_deid_add_sensitive(state, raw, paste("epi_responses_long", "response_label", sep = "\r"), responses$raw_field[[i]])
       responses$response_code[[i]] <- NA_character_
       responses$date_value[[i]] <- as.Date(NA)
       responses$numeric_value[[i]] <- NA_real_
@@ -484,11 +497,112 @@
 }
 
 .epi_deid_scan <- function(outputs, sensitive_values, sensitive_context = list()) {
-  sensitive_values <- unique(as.character(sensitive_values[!is.na(sensitive_values) & nzchar(trimws(sensitive_values))]))
-  flags <- list()
+  normalize_values <- function(value) {
+    value <- as.character(value)
+    tolower(trimws(gsub("[[:space:]]+", " ", value)))
+  }
+  nonempty_scalar <- function(value) {
+    length(value) > 0L && !is.na(value[[1L]]) && nzchar(trimws(as.character(value[[1L]])))
+  }
+
+  sensitive_values <- as.character(sensitive_values)
+  sensitive_values <- unique(sensitive_values[!is.na(sensitive_values) & nzchar(trimws(sensitive_values))])
+  sensitive_values <- unique(normalize_values(sensitive_values))
+
+  # Context names with two components are legacy table/column scopes. A third
+  # component identifies an EAV raw field and is used to prevent numeric values
+  # from colliding across logical fields.
+  context_table <- character()
+  context_column <- character()
+  context_raw_field <- character()
+  context_source <- character()
+  context_numeric <- logical()
+  if (length(sensitive_context) > 0L) {
+    context_names <- names(sensitive_context)
+    if (is.null(context_names)) context_names <- rep(NA_character_, length(sensitive_context))
+    for (j in seq_along(sensitive_context)) {
+      key <- context_names[[j]]
+      if (!nonempty_scalar(key)) next
+      pieces <- strsplit(as.character(key[[1L]]), "\r", fixed = TRUE)[[1L]]
+      table_name <- if (length(pieces) >= 1L) pieces[[1L]] else NA_character_
+      column_name <- if (length(pieces) >= 2L) pieces[[2L]] else NA_character_
+      raw_field <- if (length(pieces) >= 3L) paste(pieces[-c(1L, 2L)], collapse = "\r") else NA_character_
+      if (!nonempty_scalar(raw_field)) raw_field <- NA_character_
+      sources <- normalize_values(sensitive_context[[j]])
+      sources <- unique(sources[!is.na(sources)])
+      if (length(sources) == 0L) next
+      context_table <- c(context_table, rep(table_name, length(sources)))
+      context_column <- c(context_column, rep(column_name, length(sources)))
+      context_raw_field <- c(context_raw_field, rep(raw_field, length(sources)))
+      context_source <- c(context_source, sources)
+      context_numeric <- c(context_numeric, grepl("^[0-9+(). -]+$", sources))
+    }
+  }
+
+  # Return known-value hits for a vector of normalized cells. Numeric sources
+  # and short sources are exact matches; long nonnumeric sources retain the
+  # existing exact-or-substring behavior.
+  match_known <- function(cells, sources) {
+    hits <- rep(FALSE, length(cells))
+    if (length(cells) == 0L || length(sources) == 0L) return(hits)
+    sources <- unique(sources[!is.na(sources)])
+    if (length(sources) == 0L) return(hits)
+    cell_levels <- unique(cells)
+    level_hits <- rep(FALSE, length(cell_levels))
+    numeric_source <- grepl("^[0-9+(). -]+$", sources)
+    exact_source <- numeric_source | nchar(sources) < 8L
+    if (any(exact_source)) level_hits <- cell_levels %in% sources[exact_source]
+    long_sources <- sources[!exact_source]
+    if (length(long_sources) > 0L && any(!level_hits)) {
+      for (source in long_sources) {
+        candidate <- !level_hits & (cell_levels == source | grepl(source, cell_levels, fixed = TRUE))
+        candidate[is.na(candidate)] <- FALSE
+        level_hits <- level_hits | candidate
+        if (all(level_hits)) break
+      }
+    }
+    hits <- level_hits[match(cells, cell_levels)]
+    hits[is.na(hits)] <- FALSE
+    hits
+  }
+
+  context_sources <- function(table_name, column_name, target_raw_field, has_raw_field) {
+    in_scope <- rep(FALSE, length(context_source))
+    valid_scope <- !is.na(context_table) & !is.na(context_column)
+    if (any(valid_scope) && !is.na(table_name) && !is.na(column_name)) {
+      in_scope[valid_scope] <- context_table[valid_scope] == table_name & context_column[valid_scope] == column_name
+    }
+    if (!any(in_scope)) return(sensitive_values)
+    scoped <- context_source[in_scope]
+    scoped_raw <- context_raw_field[in_scope]
+    scoped_numeric <- context_numeric[in_scope]
+    legacy <- is.na(scoped_raw)
+    if (!has_raw_field) return(unique(c(sensitive_values, scoped)))
+    same_field <- !legacy & scoped_raw == target_raw_field
+    cross_field <- !legacy & scoped_raw != target_raw_field & !scoped_numeric
+    unique(c(sensitive_values, scoped[legacy | same_field | cross_field]))
+  }
+
+  flag_capacity <- 1024L
+  flag_n <- 0L
+  flag_columns <- list(
+    severity = character(flag_capacity), table_name = character(flag_capacity), column_name = character(flag_capacity),
+    case_id = character(flag_capacity), raw_field = character(flag_capacity), canonical_name = character(flag_capacity),
+    leak_type = character(flag_capacity)
+  )
   add_flag <- function(table_name, column_name, case_id, raw_field, canonical_name, leak_type, severity) {
-    flags[[length(flags) + 1L]] <<- tibble::tibble(severity = severity, table_name = table_name, column_name = column_name,
-      case_id = as.character(case_id), raw_field = as.character(raw_field), canonical_name = as.character(canonical_name), leak_type = leak_type)
+    flag_n <<- flag_n + 1L
+    if (flag_n > flag_capacity) {
+      flag_capacity <<- flag_capacity * 2L
+      for (column_name_i in names(flag_columns)) length(flag_columns[[column_name_i]]) <<- flag_capacity
+    }
+    flag_columns$severity[[flag_n]] <<- as.character(severity)
+    flag_columns$table_name[[flag_n]] <<- as.character(table_name)
+    flag_columns$column_name[[flag_n]] <<- as.character(column_name)
+    flag_columns$case_id[[flag_n]] <<- as.character(case_id)
+    flag_columns$raw_field[[flag_n]] <<- as.character(raw_field)
+    flag_columns$canonical_name[[flag_n]] <<- as.character(canonical_name)
+    flag_columns$leak_type[[flag_n]] <<- as.character(leak_type)
   }
   for (table_name in names(outputs)) {
     x <- outputs[[table_name]]
@@ -497,28 +611,58 @@
       if (inherits(x[[column]], "Date") || (!is.character(x[[column]]) && !is.numeric(x[[column]]))) next
       is_character <- is.character(x[[column]])
       values <- as.character(x[[column]])
-      for (i in which(!is.na(values) & nzchar(trimws(values)))) {
-        cell <- values[[i]]; normalized_cell <- tolower(trimws(gsub("[[:space:]]+", " ", cell)))
-        scoped_values <- unique(c(sensitive_values, sensitive_context[[paste(table_name, column, sep = "\r")]]))
-        for (source in scoped_values) {
-          normalized_source <- tolower(trimws(gsub("[[:space:]]+", " ", source)))
-          numeric_source <- grepl("^[0-9+(). -]+$", normalized_source)
-          hit <- if (numeric_source || nchar(normalized_source) < 8L) identical(normalized_cell, normalized_source) else identical(normalized_cell, normalized_source) || grepl(normalized_source, normalized_cell, fixed = TRUE)
-          if (isTRUE(hit)) {
-            add_flag(table_name, column, if ("case_id" %in% names(x)) x$case_id[[i]] else NA_character_, if ("raw_field" %in% names(x)) x$raw_field[[i]] else NA_character_, if ("canonical_name" %in% names(x)) x$canonical_name[[i]] else NA_character_, "known_source_value", "ERROR")
-            break
-          }
+      normalized_cells <- normalize_values(values)
+      nonmissing <- which(!is.na(values) & nzchar(trimws(values)))
+      if (length(nonmissing) == 0L) next
+
+      raw_fields <- if ("raw_field" %in% names(x)) as.character(x$raw_field) else rep(NA_character_, nrow(x))
+      has_raw_field <- !is.na(raw_fields) & nzchar(trimws(raw_fields))
+      known_hits <- rep(FALSE, nrow(x))
+      scoped_context <- rep(FALSE, length(context_source))
+      valid_scope <- !is.na(context_table) & !is.na(context_column)
+      if (any(valid_scope) && !is.na(table_name) && !is.na(column)) {
+        scoped_context[valid_scope] <- context_table[valid_scope] == table_name & context_column[valid_scope] == column
+      }
+      field_rows <- nonmissing[has_raw_field[nonmissing]]
+      if (length(field_rows) > 0L) {
+        for (target_raw_field in unique(raw_fields[field_rows])) {
+          rows <- field_rows[raw_fields[field_rows] == target_raw_field]
+          # Build field-aware candidates explicitly so numeric sources from a
+          # different EAV field are the only known-value matches suppressed.
+          candidates <- context_sources(table_name, column, target_raw_field, TRUE)
+          known_hits[rows] <- match_known(normalized_cells[rows], candidates)
         }
+      }
+      broad_rows <- nonmissing[!has_raw_field[nonmissing]]
+      if (length(broad_rows) > 0L) {
+        candidates <- if (any(scoped_context)) unique(c(sensitive_values, context_source[scoped_context])) else sensitive_values
+        known_hits[broad_rows] <- match_known(normalized_cells[broad_rows], candidates)
+      }
+      case_ids <- if ("case_id" %in% names(x)) as.character(x$case_id) else rep(NA_character_, nrow(x))
+      output_raw_fields <- if ("raw_field" %in% names(x)) as.character(x$raw_field) else rep(NA_character_, nrow(x))
+      canonical_names <- if ("canonical_name" %in% names(x)) as.character(x$canonical_name) else rep(NA_character_, nrow(x))
+      for (i in nonmissing) {
+        if (isTRUE(known_hits[[i]])) {
+          add_flag(table_name, column, case_ids[[i]], output_raw_fields[[i]], canonical_names[[i]], "known_source_value", "ERROR")
+        }
+        cell <- values[[i]]
         if (is_character && grepl("[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}", cell, ignore.case = TRUE, perl = TRUE)) {
-          add_flag(table_name, column, if ("case_id" %in% names(x)) x$case_id[[i]] else NA_character_, if ("raw_field" %in% names(x)) x$raw_field[[i]] else NA_character_, if ("canonical_name" %in% names(x)) x$canonical_name[[i]] else NA_character_, "email_pattern", "WARNING")
+          add_flag(table_name, column, case_ids[[i]], output_raw_fields[[i]], canonical_names[[i]], "email_pattern", "WARNING")
         }
         if (is_character && grepl("(?<![0-9])(?:\\+?1[ .-]?)?(?:[2-9][0-9]{2}[ .-]?[0-9]{3}[ .-]?[0-9]{4})(?![0-9])", cell, perl = TRUE)) {
-          add_flag(table_name, column, if ("case_id" %in% names(x)) x$case_id[[i]] else NA_character_, if ("raw_field" %in% names(x)) x$raw_field[[i]] else NA_character_, if ("canonical_name" %in% names(x)) x$canonical_name[[i]] else NA_character_, "phone_pattern", "WARNING")
+          add_flag(table_name, column, case_ids[[i]], output_raw_fields[[i]], canonical_names[[i]], "phone_pattern", "WARNING")
         }
       }
     }
   }
-  if (length(flags) == 0L) tibble::tibble(severity = character(), table_name = character(), column_name = character(), case_id = character(), raw_field = character(), canonical_name = character(), leak_type = character()) else dplyr::bind_rows(flags) |> dplyr::distinct()
+  if (flag_n == 0L) tibble::tibble(severity = character(), table_name = character(), column_name = character(), case_id = character(), raw_field = character(), canonical_name = character(), leak_type = character()) else {
+    flag_rows <- seq_len(flag_n)
+    dplyr::distinct(tibble::tibble(
+      severity = flag_columns$severity[flag_rows], table_name = flag_columns$table_name[flag_rows], column_name = flag_columns$column_name[flag_rows],
+      case_id = flag_columns$case_id[flag_rows], raw_field = flag_columns$raw_field[flag_rows], canonical_name = flag_columns$canonical_name[flag_rows],
+      leak_type = flag_columns$leak_type[flag_rows]
+    ))
+  }
 }
 
 .epi_deid_audit <- function(rules, events, leak_flags) {

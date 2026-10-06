@@ -1,5 +1,12 @@
 # bcapture 0.0.0.9000
 
+* Corrected known-source privacy matching for Initial Epi long-table responses
+  by retaining logical raw-field context. Cross-field numeric collisions no
+  longer flag unrelated retained quantities; same-field, global, nonnumeric,
+  and heuristic detection retain their existing criteria. Cached matching
+  preserves legacy results and reduces repeated scan work. Strict failures
+  still prevent safe-output and crosswalk finalization.
+
 * Hardened Initial Epi collation for AcroForm representation variants while
   preserving extracted and raw values: strict quoted multi-select arrays are
   decoded into derived item rows, and well-formed comma-grouped numbers and

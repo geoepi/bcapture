@@ -98,6 +98,16 @@ fail. In strict mode, potential heuristic warnings also prevent finalization.
 With `strict = FALSE`, potential warnings may produce a clearly marked
 `review` result; confirmed leaks are never accepted.
 
+Known-source matching in long response tables retains the logical `raw_field`
+as well as the table and output column. A numeric-only token withheld from one
+logical field can coincide with a retained quantity in another; such
+cross-field numeric collisions are excluded from that scoped comparison.
+Same-field numeric survival, global source identities, and cross-field
+nonnumeric text still use the existing detection criteria. Missing logical
+field metadata falls back to broader scanning, and legacy table/column scopes
+remain supported. Email/phone heuristics and strict finalization behavior are
+unchanged.
+
 ## Crosswalk storage and reuse
 
 The private destination contains `record_crosswalk.csv`,
