@@ -31,8 +31,11 @@ This is guarded canonical-form recovery, not generic Portfolio support.
 Image-only scans without a usable text layer, OCR-only or handwritten forms,
 incompatible or unknown form signatures, ambiguous containers, nested
 containers, and arbitrary unrecognized flattened layouts remain unsupported
-and fail with an explicit classified failure. OCR and template/version review
-are outside the current extraction scope.
+and fail with an explicit classified failure. Image-only Initial Epi scans were
+evaluated as an experimental feasibility topic; OCR support remains on hold
+and is not an enabled extraction route. See
+[`docs/ocr-feasibility.md`](ocr-feasibility.md) for the sanitized evidence and
+known limitations.
 
 Repeated fields retain their original logical names in raw extraction. The
 versioned dictionary and `collate_epi()` layer interprets them as house,
