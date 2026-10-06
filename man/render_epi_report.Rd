@@ -6,7 +6,7 @@
 \usage{
 render_epi_report(
   deidentified_dir,
-  report = c("summary", "quality"),
+  report = c("summary", "quality", "features"),
   output_dir = NULL,
   output_file = NULL,
   overwrite = FALSE,
@@ -16,7 +16,7 @@ render_epi_report(
 \arguments{
 \item{deidentified_dir}{De-identified Initial Epi output containing summary/.}
 
-\item{report}{Report type: "summary" or "quality".}
+\item{report}{Report type: "summary", "quality", or "features".}
 
 \item{output_dir}{Directory for human-readable reports. Defaults to reports/.}
 
@@ -31,7 +31,8 @@ A small list containing report status, output file, summary status,
 case count, and Quarto version.
 }
 \description{
-Reports consume the immutable summary products created by summarize_epi().
-They never invoke summarize_epi(), read a re-identification crosswalk, or
-access identifiable source products.
+Reports consume the immutable products created by \code{\link[=summarize_epi]{summarize_epi()}} or, for
+the feature report, \code{\link[=summarize_epi_features]{summarize_epi_features()}}. They never invoke either
+summary function, read a re-identification crosswalk, or access identifiable
+source products.
 }

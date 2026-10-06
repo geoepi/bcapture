@@ -1,0 +1,219 @@
+field,value,field_type,alt_name
+npin,SYN-NPIN-0001,/Tx,NPIN:
+premisesfarm_name,Synthetic Sunrise Farm,/Tx,Premises/Farm Name:
+premises_address,100 Test Farm Rd,/Tx,Premises Address:
+prem_city,Exampleville,/Tx,City:
+prem_county,Sample County,/Tx,County:
+prem_state,KS,/Tx,State:
+prem_zip,67000,/Tx,Zip:
+prem_gps,"38.5000, -97.2500",/Tx,GPS Coordinates:
+prem_special_id,SYN-BCAP-01,/Tx,Special ID:
+primary_contact_name,Alex Example,/Tx,Name:
+primary_contact_title,Farm Manager,/Tx,Title:
+umbrella_company,Synthetic Poultry LLC,/Tx,Umbrella Company (if applicable):
+primary_contact_phone,555-0101,/Tx,Phone:
+primary_alt_phone,555-0199,/Tx,Alternative Phone:
+primary_contact_email,contact@example.org,/Tx,Email:
+case_manager,Jordan Example,/Tx,Case Manager:
+case_manager_phone,555-0102,/Tx,Phone:
+case_manager_email,case@example.org,/Tx,Email:
+auditor,Casey Example,/Tx,Auditor:
+auditor_phone,555-0103,/Tx,Phone:
+auditor_email,auditor@example.org,/Tx,Email:
+initial_audit_date,08/20/2026,/Tx,Initial Audit Date
+FileNameField,SYNTHETIC_BCAP_TEST,/Tx,FileNameField
+Q1_1_1,/No,/Btn,Q1_1_1
+Q1_1_1a,Synthetic Q111a,/Tx,Q1_1_1a
+Q1_1_1_complete,/Yes,/Btn,Q1_1_1_complete
+Q1_1_2,/Yes,/Btn,Q1_1_2
+Q1_1_2_complete,/Off,/Btn,Q1_2_5_complete
+Q1_1_comments,Synthetic test ments,/Tx,Q1_1_comments
+Q1_1_result,/Pass,/Btn,Q1_1_result
+Q1_1_rem_complete,08/15/2026,/Tx,Q1_1_rem_complete
+Q1_2_3,/No,/Btn,Q1_2_3
+Q1_2_3_complete,/Yes,/Btn,Q1_2_3_complete
+Q1_2_4_complete,/Off,/Btn,Q1_2_4_complete
+Q1_2_4,/Yes,/Btn,Q1_2_4
+Q1_2_5_complete,/Yes,/Btn,Q1_2_6_complete
+Q1_2_5,/Yes,/Btn,Q1_2_5
+Q1_2_6_complete,/Off,/Btn,Q1_2_6_complete
+Q1_2_6,/Yes,/Btn,Q1_2_6
+Q1_2_7_complete,/Off,/Btn,Q1_2_7_complete
+Q1_2_7,/Yes,/Btn,Q1_2_7
+Q1_2_8_complete,/Off,/Btn,Q1_2_8_complete
+Q1_2_8,/No,/Btn,Q1_2_8
+Q1_2_9_complete,/Yes,/Btn,Q1_2_9_complete
+Q1_2_9,/Yes,/Btn,Q1_2_9
+Q1_2_10a_complete,/Yes,/Btn,Q1_2_10b_complete
+Q1_2_10a,/No,/Btn,Q1_2_10a
+Q1_2_10b,/No,/Btn,Q1_2_10b
+Q1_2_10b_complete,/Yes,/Btn,Q1_2_10c_complete
+Q1_2_11_complete,/Off,/Btn,Q1_4_17a_complete
+Q1_2_11,/Yes,/Btn,Q1_2_11
+Q1_2_12_complete,/Yes,/Btn,Q1_2_12_complete
+Q1_2_12,/No,/Btn,Q1_2_12
+Q1_2_13_complete,/Yes,/Btn,Q1_2_13_complete
+Q1_2_13,/Yes,/Btn,Q1_2_13
+Q1_2_14_complete,/Yes,/Btn,Q1_2_14_complete
+Q1_2_14,/No,/Btn,Q1_2_14
+Q1_2_comments,Synthetic test ments,/Tx,Q1_2_comments
+Q1_2_result,/Pass,/Btn,Q1_2_result
+Q1_2_rem_complete,08/24/2026,/Tx,Q1_2_rem_complete
+Q1_3_15_complete,/Off,/Btn,Q1_3_15_complete
+Q1_3_15,/Yes,/Btn,Q1_3_15
+Q1_3_16_complete,/Yes,/Btn,Q1_3_16_complete
+Q1_3_16,/No,/Btn,Q1_3_16
+Q1_3_comments,Synthetic test ments,/Tx,Q1_3_comments
+Q1_3_rem_complete,08/04/2026,/Tx,Q1_3_rem_complete
+Q1_3_result,/No pass,/Btn,Q1_3_result
+Q1_4_17a_complete,/Yes,/Btn,Q1_4_17d_complete
+Q1_4_17a,/Yes,/Btn,Q1_4_17a
+Q1_4_17b_complete,/Yes,/Btn,Q1_4_17b_complete
+Q1_4_17b,/No,/Btn,Q1_4_17b
+Q1_4_17d_complete,/Yes,/Btn,Q1_4_18_complete
+Q1_4_17d,/No,/Btn,Q1_4_17d
+Q1_4_17e_complete,/Off,/Btn,Q1_4_17e_complete
+Q1_4_17e,/Yes,/Btn,Q1_3_17e
+Q1_4_17c,/Yes,/Btn,Q1_4_17c
+Q1_4_18_complete,/Yes,/Btn,Q1_5_20c_complete
+Q1_4_18,/Yes,/Btn,Q1_4_18
+Q1_4_19_complete,/Yes,/Btn,Q1_4_19_complete
+Q1_4_19,/No,/Btn,Q1_4_19
+Q1_4_comments,Synthetic test ments,/Tx,Q1_4_comments
+Q1_4_result,/Pass,/Btn,Q1_4_result
+Q1_4_rem_complete,08/10/2026,/Tx,Q1_4_rem_complete
+Q1_5_20a_complete,/Off,/Btn,Q1_5_20a_complete
+Q1_5_20a,/Yes,/Btn,Q1_5_20a
+Q1_5_20b_complete,/Yes,/Btn,Q1_5_20b_complete
+Q1_5_20b,/Yes,/Btn,Q1_5_20b
+Q1_5_20c_complete,/Yes,/Btn,Q1_6_23_complete
+Q1_5_20c,/Yes,/Btn,Q1_5_20c
+Q1_5_21a_complete,/Yes,/Btn,Q1_5_21a_complete
+Q1_5_21a,/No,/Btn,Q1_5_21a
+Q1_5_201b_complete,/Yes,/Btn,Q1_5_21b_complete
+Q1_5_21b,/No,/Btn,Q1_5_21b
+Q1_5_22_complete,/Yes,/Btn,Q1_5_22_complete
+Q1_5_22,/No,/Btn,Q1_5_22
+Q1_5_comments,Synthetic test ments,/Tx,Q1_5_comments
+Q1_5_result,/Pass,/Btn,Q1_5_result
+Q1_5_rem_complete,08/27/2026,/Tx,Q1_5_rem_complete
+Q1_6_23_complete,/Off,/Btn,Q1_6_27_complete
+Q1_6_23,/Yes,/Btn,Q1_6_23
+Q1_6_24_complete,/Yes,/Btn,Q1_6_24_complete
+Q1_6_24,/No,/Btn,Q1_6_24
+Q1_6_25_complete,/Yes,/Btn,Q1_6_25_complete
+Q1_6_25,/Yes,/Btn,Q1_6_25
+Q1_6_26_complete,/Yes,/Btn,Q1_6_26_complete
+Q1_6_26,/No,/Btn,Q1_6_26
+Q1_6_comments,Synthetic test ments,/Tx,Q1_6_comments
+Q1_6_result,/No pass,/Btn,Q1_6_result
+Q1_6_rem_complete,08/27/2026,/Tx,Q1_6_rem_complete
+Q1_7_27_complete,/Yes,/Btn,Q1_7_27_complete
+Q1_7_27,/No,/Btn,Q1_7_27
+Q1_7_28_complete,/Yes,/Btn,Q1_7_28_complete
+Q1_7_28,/No,/Btn,Q1_7_28
+Q1_7_29_complete,/Yes,/Btn,Q1_7_29_complete
+Q1_7_29,/No,/Btn,Q1_7_29
+Q1_7_30_complete,/Yes,/Btn,Q1_7_30_complete
+Q1_7_30,/Yes,/Btn,Q1_7_30
+Q1_7_31_complete,/Yes,/Btn,Q1_7_31_complete
+Q1_7_31,/Yes,/Btn,Q1_7_31
+Q1_7_comments,Synthetic test ments,/Tx,Q1_7_comments
+Q1_7_result,/Pass,/Btn,Q1_7_result
+Q1_7_rem_complete,08/24/2026,/Tx,Q1_7_rem_complete
+Q2_1_32_complete,/Yes,/Btn,Q2_2_34_complete
+Q2_1_32,/Yes,/Btn,Q2_1_32
+Q2_1_33a,/Yes,/Btn,Q2_1_33a
+Q2_1_33b,/No,/Btn,Q2_1_33b
+Q2_1_33c_complete,/Yes,/Btn,Q2_1_33c_complete
+Q2_1_33c,/No,/Btn,Q2_1_33c
+Q2_1_33d,/No,/Btn,Q2_1_33d
+Q2_1_33e,Synthetic 2133e,/Tx,additional details
+Q2_1_comments,Synthetic test ments,/Tx,Q2_1_comments
+Q2_1_result,/Pass,/Btn,Q2_1_result
+Q2_1_rem_complete,08/18/2026,/Tx,Q2_1_rem_complete
+Q2_2_34_complete,/Off,/Btn,Q3_1_37_complete
+Q2_2_34,/No,/Btn,Q2_2_34
+Q2_2_35a_complete,/Yes,/Btn,Q2_2_35a_complete
+Q2_2_35a,/No,/Btn,Q2_2_35a
+Q2_2_35b_complete,/Off,/Btn,Q2_2_35b_complete
+Q2_2_35b,/No,/Btn,Q2_2_35b
+Q2_2_35c,/Yes,/Btn,Q2_2_35c
+Q2_2_35c_complete,/Off,/Btn,Q2_2_35c_complete
+Q2_2_comments,Synthetic test ments,/Tx,Q2_2_comments
+Q2_2_result,/No pass,/Btn,Q2_2_result
+Q2_2_rem_complete,08/09/2026,/Tx,Q2_2_rem_complete
+Q2_3_36_complete,/Yes,/Btn,Q2_3_36_complete
+Q2_3_36,/Yes,/Btn,Q2_3_36
+Q2_3_comments,Synthetic test ments,/Tx,Q2_3_comments
+Q2_3_result,/Pass,/Btn,Q2_3_result
+Q2_3_rem_complete,08/11/2026,/Tx,Q2_3_rem_complete
+Q3_1_37_complete,/Yes,/Btn,Q3_1_39_complete
+Q3_1_37,/No,/Btn,Q3_1_37
+Q3_1_38_complete,/Yes,/Btn,Q3_1_38_complete
+Q3_1_38,/Yes,/Btn,Q3_1_38
+Q1_2_10c_complete,/Off,/Btn,Q1_2_11_complete
+Q1_2_10c,/No,/Btn,Q1_2_10c
+Q3_1_39_complete,/Off,/Btn,Q3_1_39_complete
+Q3_1_39,/Yes,/Btn,Q3_1_39
+Q3_1_comments,Synthetic test ments,/Tx,Q3_1_comments
+Q3_1_result,/No pass,/Btn,Q3_1_result
+Q3_1_rem_complete,08/05/2026,/Tx,Q3_1_rem_complete
+Q3_2_40_complete,/Yes,/Btn,Q3_2_40_complete
+Q3_2_40,/Yes,/Btn,Q3_2_40
+Q3_2_41_complete,/Off,/Btn,Q3_2_41_complete
+Q3_2_41,/No,/Btn,Q3_2_41
+Q3_2_42_complete,/Yes,/Btn,Q3_2_42_complete
+Q3_2_42,/No,/Btn,Q3_2_42
+Q3_2_43_complete,/Yes,/Btn,Q3_2_43_complete
+Q3_2_43,/No,/Btn,Q3_2_43
+Q3_2_44,/No,/Btn,Q3_2_44
+Q3_2_44_complete,/Off,/Btn,Q3_2_44_complete
+Q3_2_45a_complete,/Off,/Btn,Q3_2_45a_complete
+Q3_2_45a,/No,/Btn,Q3_2_45a
+Q3_2_45b,Synthetic 3245b,/Tx,Q3_2_45b
+Q3_2_46a_complete,/Yes,/Btn,Q3_2_46a_complete
+Q3_2_46a,/No,/Btn,Q3_2_46a
+Q3_2_46b,Synthetic 3246b,/Tx,Q3_2_46b
+Q3_2_47a_complete,/Yes,/Btn,Q3_2_47a_complete
+Q3_2_47a,/Yes,/Btn,Q3_2_47a
+Q3_2_47b,/No,/Btn,Q3_2_47b
+Q3_2_comments,Synthetic test ments,/Tx,Q3_2_comments
+Q3_2_rem_complete,08/26/2026,/Tx,Q3_2_rem_complete
+Q3_2_result,/No pass,/Btn,Q3_2_result
+Q3_3_48a,/Yes,/Btn,Q3_3_48a
+Q3_3_48a_complete,/Yes,/Btn,Q3_3_48a_complete
+Q3_3_48b_complete,/Yes,/Btn,Q3_3_48b_complete
+Q3_3_48b,/No,/Btn,Q3_3_48b
+Q3_3_48c_complete,/Yes,/Btn,Q3_3_48c_complete
+Q3_3_48c,/No,/Btn,Q3_3_48c
+Q3_3_48d_complete,/Off,/Btn,Q3_3_48d_complete
+Q3_3_48d,/Yes,/Btn,Q3_3_48d
+Q3_3_48e,Synthetic 3348e,/Tx,Q3_3_48e
+Q3_3_49a_complete,/Yes,/Btn,Q3_3_49a_complete
+Q3_3_49a,/Yes,/Btn,Q3_3_49a
+Q3_3_49b,Synthetic 3349b,/Tx,Q3_3_49b
+Q3_3_comments,Synthetic test ments,/Tx,Q3_3_comments
+Q3_3_rem_complete,08/21/2026,/Tx,Q3_3_rem_complete
+Q3_3_result,/No pass,/Btn,Q3_3_result
+Q3_4_50a,/Yes,/Btn,Q3_4_50a
+Q3_4_50a_complete,/Yes,/Btn,Q3_4_50a_complete
+Q3_4_50b_complete,/Off,/Btn,Q3_4_50b_complete
+Q3_4_50b,/No,/Btn,Q3_4_50b
+Q3_4_51,/No,/Btn,Q3_4_51
+Q3_4_51_complete,/Yes,/Btn,Q3_4_51_complete
+Q3_4_comments,Synthetic test ments,/Tx,Q3_4_comments
+Q3_4_result,/No pass,/Btn,Q3_4_result
+Q3_4_rem_complete,08/23/2026,/Tx,Q3_4_rem_complete
+Q3_5_52,/No,/Btn,Q3_5_52
+Q3_5_53,/No,/Btn,Q3_5_53
+Q3_5_52_complete,/Yes,/Btn,Q3_5_52_complete
+Q3_5_53_complete,/Yes,/Btn,Q3_5_53_complete
+Q3_5_comments,Synthetic test ments,/Tx,Q3_5_comments
+Q3_5_result,/No pass,/Btn,Q3_5_result
+Q3_5_rem_complete,08/26/2026,/Tx,Q3_5_rem_complete
+audit_pass_date,08/31/2026,/Tx,audit_pass_date
+BCAP_approved,/Yes,/Btn,BCAP_approved
+Producer_name,Taylor Example,/Tx,Producer_name
+Producer_title,Owner,/Tx,Producer_title
+Producer_date,08/31/2026,/Tx,Producer_date

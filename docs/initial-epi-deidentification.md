@@ -23,6 +23,11 @@ does not make legal, regulatory, HIPAA, compliance, or public-release claims.
 The `analysis` profile is intended for controlled analytical use, not
 unrestricted distribution.
 
+`deidentified_dir` and `crosswalk_dir` are caller-selected operational
+destinations; the package does not require a fixed local path layout. Store
+both outside version-controlled source, keep them physically separate, and
+never treat an example path such as `D:/secure/...` as a package requirement.
+
 ```r
 deidentify_epi(
   out_dir = "epi_output",
@@ -97,6 +102,21 @@ conservative email/phone heuristics before finalization. Confirmed leaks always
 fail. In strict mode, potential heuristic warnings also prevent finalization.
 With `strict = FALSE`, potential warnings may produce a clearly marked
 `review` result; confirmed leaks are never accepted.
+
+Finalization is fail-closed: safe analytical files are published only after
+strict privacy validation succeeds with no errors or warnings. A strict failure
+does not finalize new safe output or a new crosswalk, and an existing valid
+crosswalk is not silently replaced or renumbered.
+
+Known-source matching in long response tables retains the logical `raw_field`
+as well as the table and output column. A numeric-only token withheld from one
+logical field can coincide with a retained quantity in another; such
+cross-field numeric collisions are excluded from that scoped comparison.
+Same-field numeric survival, global source identities, and cross-field
+nonnumeric text still use the existing detection criteria. Missing logical
+field metadata falls back to broader scanning, and legacy table/column scopes
+remain supported. Email/phone heuristics and strict finalization behavior are
+unchanged.
 
 ## Crosswalk storage and reuse
 

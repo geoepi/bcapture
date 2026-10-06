@@ -12,7 +12,16 @@ utils::globalVariables(c(
   "question_id", "subquestion_id", "field_role", "response_type", "raw_value", "value",
   "response_code", "response_label", "units", "n_rows", "status", "mapping_count",
   "mapped", "unknown_field_names", "raw_fields", "mapped_fields", "unknown_fields",
-  "populated_fields", "populated_mapped_fields", "populated_unmapped_fields"
+  "populated_fields", "populated_mapped_fields", "populated_unmapped_fields",
+  "display_item", "display_label", "display_percent", "display_response",
+  "display_rule", "display_table", "item_code", "item_label", "label",
+  "max_records_per_case", "median", "median_records_per_case", "n_cases",
+  "n_findings", "q25", "q75", "response_order", "scope",
+  "validation_status", "finding_type", "feature_name", "feature_label",
+  "domain_id", "domain_label", "case_id", "summary_level",
+  "display_category", "display_domain", "display_feature", "display_finding",
+  "numeric_value", "percent_known_cells", "percent_missing",
+  "percent_of_known", "percent_true_of_known"
 ))
 
 schema_hash_from_fields <- function(fields) {
@@ -33,6 +42,15 @@ assign_schema_groups <- function(hashes) {
   unique_hashes <- sort(unique(as.character(stats::na.omit(hashes))))
   groups <- stats::setNames(sprintf("schema_%03d", seq_along(unique_hashes)), unique_hashes)
   unname(groups[as.character(hashes)])
+}
+
+schema_identity_from_table <- function(x) {
+  actual <- if ("form_schema_hash" %in% names(x)) as.character(x$form_schema_hash) else rep(NA_character_, nrow(x))
+  canonical <- if ("canonical_template_schema_hash" %in% names(x)) as.character(x$canonical_template_schema_hash) else rep(NA_character_, nrow(x))
+  method <- if ("extraction_method" %in% names(x)) as.character(x$extraction_method) else rep(NA_character_, nrow(x))
+  spatial <- method == "spatial_template" & !is.na(canonical) & nzchar(canonical)
+  actual[spatial] <- canonical[spatial]
+  actual
 }
 
 schema_difference_counts <- function(diagnostic) {

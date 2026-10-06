@@ -84,10 +84,17 @@ new_validation_results <- function() {
 }
 
 .epi_validation_table_raw_field <- function(dictionary, table_name, row_index, column_name, row_label = NA_character_) {
-  fields <- dictionary$fields[dictionary$fields$table_name == table_name &
-    dictionary$fields$column_name == column_name & as.integer(dictionary$fields$row_index) == as.integer(row_index), , drop = FALSE]
+  field_table_name <- as.character(dictionary$fields$table_name)
+  field_column_name <- as.character(dictionary$fields$column_name)
+  field_row_index <- suppressWarnings(as.integer(dictionary$fields$row_index))
+  target_row_index <- suppressWarnings(as.integer(row_index))
+  keep <- !is.na(field_table_name) & !is.na(table_name) & field_table_name == as.character(table_name) &
+    !is.na(field_column_name) & !is.na(column_name) & field_column_name == as.character(column_name) &
+    !is.na(field_row_index) & !is.na(target_row_index) & field_row_index == target_row_index
+  fields <- dictionary$fields[keep, , drop = FALSE]
   if (!is.na(row_label) && nzchar(row_label)) {
-    labeled <- fields[as.character(fields$row_label) == as.character(row_label), , drop = FALSE]
+    field_row_label <- as.character(fields$row_label)
+    labeled <- fields[!is.na(field_row_label) & field_row_label == as.character(row_label), , drop = FALSE]
     if (nrow(labeled) > 0L) fields <- labeled
   }
   if (nrow(fields) == 0L) NA_character_ else as.character(fields$raw_field[[1L]])

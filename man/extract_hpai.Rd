@@ -36,10 +36,14 @@ Compliance Audit Program PDF forms in a directory.
 }
 \details{
 Python and the \code{pypdf} package are required and initialized lazily.
-Only interactive AcroForm PDFs are supported. Flattened or scanned PDFs
-are recorded as failures and do not generate empty successful records.
-One failed PDF does not stop the remaining batch. The output directory is
-rebuilt from successful extractions in the current invocation.
+Recognized selectable-text flattened PDFs are reconstructed with the
+versioned spatial template. Scanned, OCR-only, handwritten, and
+unrecognized flattened PDFs are recorded as failures and do not generate
+empty successful records. One failed PDF does not stop the remaining
+batch. The output directory is rebuilt from successful extractions in the
+current invocation.
+XFA and PDF containers are unsupported for BCAP; recognized non-PDF C2PA
+provenance manifests do not change standalone routing.
 }
 \examples{
 \dontrun{

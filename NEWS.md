@@ -1,5 +1,41 @@
 # bcapture 0.0.0.9000
 
+* Corrected known-source privacy matching for Initial Epi long-table responses
+  by retaining logical raw-field context. Cross-field numeric collisions no
+  longer flag unrelated retained quantities; same-field, global, nonnumeric,
+  and heuristic detection retain their existing criteria. Cached matching
+  preserves legacy results and reduces repeated scan work. Strict failures
+  still prevent safe-output and crosswalk finalization.
+
+* Hardened Initial Epi collation for AcroForm representation variants while
+  preserving extracted and raw values: strict quoted multi-select arrays are
+  decoded into derived item rows, and well-formed comma-grouped numbers and
+  leading decimals are normalized before typed parsing. Malformed or unknown entries
+  remain available for validation review. Repeated-table validation also
+  ignores incomplete dictionary metadata when restoring public `raw_field`
+  provenance on findings.
+
+* Added conservative in-memory Initial Epi Portfolio/embedded-PDF extraction
+  for a unique canonical interactive form, with submitted-container and selected
+  member provenance. Ambiguous aggregates, duplicate logical fields, XFA,
+  encrypted/unreadable attachments, and unsupported member schemas fail explicitly.
+  BCAP containers remain unsupported. Recognized C2PA provenance manifests
+  preserve standalone AcroForm and flattened extraction.
+
+* Classified scans before spatial page-count checks, retained typed Python
+  failures and attempted extraction routes, and omitted unrepresentable NUL
+  metadata with an omission indicator. Logical field strings are never repaired.
+
+* Reduced repeated button-diagnostic comparisons while preserving ordered
+  candidate rows, states, and geometric evidence.
+
+* Added versioned template-guided extraction for selectable-text flattened
+  Initial Epi and BCAP PDFs, with page-registration provenance, rendered
+  control-mark evidence, explicit failure classes, and mixed-batch route
+  diagnostics. OCR and handwriting remain unsupported.
+
+* Added descriptive summaries, visualization, and self-contained Quarto HTML reporting for Initial Epi analytical features.
+
 * Added a versioned, privacy-gated, auditable case-level Initial Epi feature
   registry and `derive_epi_features()` for de-identified analytical data.
 

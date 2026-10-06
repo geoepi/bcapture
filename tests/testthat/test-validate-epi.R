@@ -170,6 +170,68 @@ test_that("unknown normalized multiselect options are errors", {
   expect_true(all(result$severity[result$rule_id == "unknown_multiselect_option"] == "ERROR"))
 })
 
+test_that("quoted multiselect arrays retain strict unknown-option errors", {
+  out_dir <- .synthetic_validation_output(list(
+    p0139d = "['Poultry', 'Cattle Dairy', 'Unregistered option']"
+  ))
+  result <- bcapture::validate_epi(out_dir, quiet = TRUE, write = FALSE)
+  unknown <- result[result$rule_id == "unknown_multiselect_option", , drop = FALSE]
+  expect_equal(nrow(unknown), 1L)
+  expect_equal(unknown$raw_field, "p0139d")
+  expect_equal(unknown$severity, "ERROR")
+  multiselect <- readr::read_csv(
+    file.path(out_dir, "collated", "epi_multiselect_responses.csv"),
+    show_col_types = FALSE
+  )
+  expect_setequal(
+    multiselect$item_label[multiselect$raw_field == "p0139d"],
+    c("Poultry", "Cattle Dairy", "Unregistered option")
+  )
+})
+
+test_that("escaped NUL in a quoted multiselect remains an unknown option", {
+  escaped_nul <- '["Poultry\\u0000"]'
+  out_dir <- .synthetic_validation_output(list(p0139d = escaped_nul))
+  result <- bcapture::validate_epi(out_dir, quiet = TRUE, write = FALSE)
+  unknown <- result[result$rule_id == "unknown_multiselect_option", , drop = FALSE]
+  expect_equal(nrow(unknown), 1L)
+  expect_equal(unknown$raw_field, "p0139d")
+  expect_equal(unknown$severity, "ERROR")
+  multiselect <- readr::read_csv(
+    file.path(out_dir, "collated", "epi_multiselect_responses.csv"),
+    show_col_types = FALSE
+  )
+  expect_identical(multiselect$item_label[multiselect$raw_field == "p0139d"], escaped_nul)
+})
+
+test_that("grouped numeric values remain parsed while negative and coordinate checks persist", {
+  out_dir <- .synthetic_validation_output(list(
+    premlat = "91", p0005 = "-1,000", p00010a = "House 1", p00010c = "-1,000"
+  ))
+  result <- bcapture::validate_epi(out_dir, quiet = TRUE, write = FALSE)
+  expect_false(any(result$rule_id == "expected_numeric_unparseable"))
+  expect_true(any(result$rule_id == "negative_value" & result$raw_field == "p0005"))
+  expect_true(any(result$rule_id == "negative_value" & result$table_name == "houses" & result$raw_field == "p00010c"))
+  expect_true(any(result$rule_id == "latitude_out_of_range"))
+})
+
+test_that("table raw-field provenance ignores incomplete dictionary rows", {
+  dictionary <- bcapture:::load_epi_dictionary()
+  unrelated <- dictionary$fields[1L, , drop = FALSE]
+  unrelated$table_name <- NA_character_
+  unrelated$column_name <- NA_character_
+  unrelated$row_index <- NA_integer_
+  unrelated$raw_field <- "unrelated"
+  dictionary$fields <- dplyr::bind_rows(unrelated, dictionary$fields)
+
+  expect_equal(
+    bcapture:::.epi_validation_table_raw_field(
+      dictionary, "houses", 1L, "birds_today"
+    ),
+    "p00010c"
+  )
+})
+
 test_that("strict mode writes complete findings and signals only errors", {
   out_dir <- .synthetic_validation_output(list(p0310 = "/9"))
   expect_warning(result <- bcapture::validate_epi(out_dir, strict = TRUE, quiet = TRUE), "Strict Initial Epi validation")

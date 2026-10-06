@@ -1,0 +1,330 @@
+---
+title: "Initial Epi Analytical Feature Review"
+author: "bcapture"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: true
+    self-contained: true
+    code-fold: false
+css: assets/epi-report.css
+execute:
+  echo: false
+  warning: false
+  message: false
+params:
+  data_file: null
+  plot_helpers: null
+  report_title: "Initial Epi Analytical Feature Review"
+  generated_at: null
+---
+
+```{r}
+p <- readRDS(params$data_file)
+manifest <- p$feature_summary_manifest
+overview <- p$overview
+status <- as.character(manifest$status[[1L]])
+
+fmt_integer <- function(x) {
+  ifelse(is.na(x), "-", format(as.integer(round(as.numeric(x))), big.mark = ",", trim = TRUE))
+}
+fmt_decimal <- function(x, digits = 1L) {
+  ifelse(is.na(x), "-", format(round(as.numeric(x), digits), nsmall = 0L,
+    trim = TRUE, scientific = FALSE))
+}
+fmt_percent <- function(x) paste0(fmt_decimal(x, 1L), "%")
+fmt <- function(x) ifelse(is.na(x) | !nzchar(as.character(x)), "-", as.character(x))
+humanize <- function(x) tools::toTitleCase(gsub("_+", " ", as.character(x)))
+wrap_label <- function(x, width = 42L) vapply(as.character(x), function(value) {
+  paste(strwrap(value, width = width), collapse = "\n")
+}, character(1))
+table_html <- function(x, class = "epi-table") {
+  if (nrow(x) == 0L) return("No rows to display.")
+  classes <- unique(c("epi-table", strsplit(class, " +")[[1L]]))
+  html <- knitr::kable(x, format = "html", escape = TRUE,
+    table.attr = paste0('class="', paste(classes, collapse = " "), '"'))
+  paste0('<div class="epi-table-scroll">', html, "</div>")
+}
+theme_feature <- function() {
+  ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.grid.major.y = ggplot2::element_blank(),
+      plot.title = ggplot2::element_text(face = "bold"),
+      plot.caption = ggplot2::element_text(hjust = 0, colour = "#52616b"),
+      axis.text.y = ggplot2::element_text(lineheight = 0.9)
+    )
+}
+```
+
+::: {.callout-note}
+**Controlled-use notice**
+
+This report summarizes de-identified case-level analytical features derived
+from structured Initial Epi questionnaire data. These features are descriptive
+representations of questionnaire observations. They are not risk scores and do
+not imply causation.
+
+This report does not contain a private re-identification crosswalk and is not
+automatically suitable for unrestricted public release.
+:::
+
+```{r, results='asis'}
+if (identical(status, "review")) {
+  cat("::: {.callout-warning}\n**Analytical status: REVIEW**\n\nFeature or consistency findings remain for review. No inferential conclusion is generated.\n:::\n")
+} else {
+  cat("::: {.callout-note}\n**Analytical status: PASSED**\n\nThe descriptive feature summaries passed their configured analytical gates.\n:::\n")
+}
+```
+
+## Feature overview
+
+All aggregate statistics in this report are read from `features/summary/*.csv`.
+The report does not recompute feature derivations.
+
+```{r, results='asis'}
+overview_table <- data.frame(
+  Measure = c("Cases", "Features", "Domains", "Binary features", "Categorical features",
+    "Numeric features", "Count features", "Consistency findings",
+    "Consistency warnings", "Consistency errors", "Source feature status"),
+  Value = c(overview$n_cases, overview$n_features, overview$n_domains,
+    overview$n_binary, overview$n_categorical, overview$n_numeric, overview$n_count,
+    overview$n_consistency_findings, overview$n_consistency_warnings,
+    overview$n_consistency_errors, overview$source_feature_status)
+)
+cat(table_html(overview_table, "epi-table-compact"))
+```
+
+## Domain coverage
+
+Coverage describes the completeness of recorded feature information. It is not
+a measure of domain importance, quality, or risk.
+
+```{r, fig.height=5.8, fig.width=9}
+coverage <- p$domain_coverage
+coverage <- coverage[order(coverage$percent_known_cells), , drop = FALSE]
+coverage$display_domain <- factor(coverage$domain_label, levels = coverage$domain_label)
+ggplot2::ggplot(coverage, ggplot2::aes(x = display_domain, y = percent_known_cells)) +
+  ggplot2::geom_col(fill = "#6b8e9e") + ggplot2::coord_flip() +
+  ggplot2::scale_x_discrete(labels = function(x) wrap_label(x, 42L)) +
+  ggplot2::labs(x = NULL, y = "Percent of case-feature cells known",
+    caption = "Information coverage only; a TRUE state is not treated as better or worse.") +
+  theme_feature()
+```
+
+```{r, results='asis'}
+coverage_table <- data.frame(
+  Domain = coverage$domain_label,
+  Features = fmt_integer(coverage$n_features),
+  Cases = fmt_integer(coverage$n_cases),
+  `Known cells` = fmt_integer(coverage$n_known_cells),
+  `Missing cells` = fmt_integer(coverage$n_missing_cells),
+  `Known cells (%)` = fmt_percent(coverage$percent_known_cells),
+  `Cases with any known (%)` = fmt_percent(coverage$percent_cases_with_any_known_feature),
+  `Cases with all known (%)` = fmt_percent(coverage$percent_cases_with_all_features_known),
+  check.names = FALSE
+)
+cat(table_html(coverage_table))
+```
+
+## Binary feature prevalence
+
+Percentages use cases with an explicit TRUE or FALSE derived value as the
+denominator. Missing feature values are not treated as FALSE.
+
+```{r, fig.height=8.5, fig.width=10}
+binary <- p$binary[order(p$binary$percent_true_of_known), , drop = FALSE]
+binary$display_feature <- factor(binary$feature_label, levels = binary$feature_label)
+ggplot2::ggplot(binary, ggplot2::aes(x = display_feature, y = percent_true_of_known)) +
+  ggplot2::geom_col(fill = "#2c6e8f") + ggplot2::coord_flip() +
+  ggplot2::scale_x_discrete(labels = function(x) wrap_label(x, 48L)) +
+  ggplot2::labs(x = NULL, y = "Percent TRUE among known responses",
+    caption = "Descriptive prevalence of recorded derived states; no risk direction is assigned.") +
+  theme_feature()
+```
+
+```{r, results='asis'}
+binary_table <- data.frame(
+  Feature = binary$feature_label, Domain = binary$domain_label,
+  Known = fmt_integer(binary$n_known), Missing = fmt_integer(binary$n_missing),
+  `TRUE among known (%)` = fmt_percent(binary$percent_true_of_known),
+  `TRUE among all cases (%)` = fmt_percent(binary$percent_true_of_all_cases),
+  check.names = FALSE
+)
+cat(table_html(binary_table))
+```
+
+## Categorical feature distributions
+
+`Don't know` and `Not applicable` remain substantive questionnaire states and
+are included in the known-state denominator. Registry-defined categories with
+zero observations remain visible.
+
+```{r, results='asis'}
+categorical <- p$categorical
+for (feature_name in unique(categorical$feature_name)) {
+  current <- categorical[categorical$feature_name == feature_name, , drop = FALSE]
+  cat("### ", current$feature_label[[1L]], "\n\n", sep = "")
+  display <- data.frame(
+    Category = current$category, Recorded = fmt_integer(current$n),
+    `Percent of known states` = fmt_percent(current$percent_of_known),
+    `Percent of all cases` = fmt_percent(current$percent_of_all_cases),
+    Missing = fmt_integer(current$n_missing), check.names = FALSE
+  )
+  cat(table_html(display, "epi-table-compact"), "\n\n")
+}
+```
+
+## Count and numeric features
+
+Aggregate descriptive statistics below come from the feature summary products.
+For the figures only, the renderer stages the minimum necessary de-identified
+numeric/count values, without case identifiers. This is the sole case-level
+data exception in this aggregate report; no fitted curves or inferential
+statistics are added.
+
+For count features, zero means zero qualifying retained-content records. It
+does not confirm absence of the underlying event.
+
+```{r, results='asis'}
+numeric <- p$numeric
+numeric_table <- data.frame(
+  Feature = numeric$feature_label, Domain = numeric$domain_label, Unit = fmt(numeric$unit),
+  Recorded = fmt_integer(numeric$n_nonmissing), Missing = fmt_integer(numeric$n_missing),
+  Mean = fmt_decimal(numeric$mean, 2L), SD = fmt_decimal(numeric$sd, 2L),
+  Median = fmt_decimal(numeric$median, 2L), Q25 = fmt_decimal(numeric$q25, 2L),
+  Q75 = fmt_decimal(numeric$q75, 2L), Minimum = fmt_decimal(numeric$min, 2L),
+  Maximum = fmt_decimal(numeric$max, 2L), check.names = FALSE
+)
+cat("### Numeric summaries\n\n", table_html(numeric_table), "\n\n", sep = "")
+
+counts <- p$count
+count_table <- data.frame(
+  Feature = counts$feature_label, Domain = counts$domain_label,
+  Recorded = fmt_integer(counts$n_nonmissing), Zero = fmt_integer(counts$n_zero),
+  Positive = fmt_integer(counts$n_positive), Mean = fmt_decimal(counts$mean, 2L),
+  SD = fmt_decimal(counts$sd, 2L), Median = fmt_decimal(counts$median, 2L),
+  Q25 = fmt_decimal(counts$q25, 2L), Q75 = fmt_decimal(counts$q75, 2L),
+  Minimum = fmt_decimal(counts$min, 2L), Maximum = fmt_decimal(counts$max, 2L),
+  check.names = FALSE
+)
+cat("### Count summaries\n\n", table_html(count_table), "\n\n", sep = "")
+```
+
+```{r, fig.height=3.1, fig.width=9, results='asis'}
+distribution <- p$distribution_data
+for (feature_name in unique(distribution$feature_name)) {
+  current <- distribution[distribution$feature_name == feature_name, , drop = FALSE]
+  current$display_feature <- factor(wrap_label(current$feature_label, 48L))
+  plot <- ggplot2::ggplot(current, ggplot2::aes(x = display_feature, y = numeric_value)) +
+    ggplot2::geom_boxplot(width = 0.28, outlier.shape = NA, fill = "#d8e4e9",
+      colour = "#2c6e8f") +
+    ggplot2::geom_point(position = ggplot2::position_jitter(
+      width = 0.09, height = 0, seed = 1729L), alpha = 0.55, size = 1.8,
+      colour = "#24313a") + ggplot2::coord_flip() +
+    ggplot2::labs(title = current$feature_label[[1L]], x = NULL,
+      y = if (current$feature_type[[1L]] == "count") "Recorded qualifying rows" else "Recorded value") +
+    theme_feature()
+  print(plot)
+}
+```
+
+## Feature missingness
+
+```{r, fig.height=10.5, fig.width=10}
+missingness <- p$missingness[order(p$missingness$percent_missing, decreasing = TRUE), , drop = FALSE]
+missingness$display_feature <- factor(missingness$feature_label,
+  levels = rev(missingness$feature_label))
+ggplot2::ggplot(missingness, ggplot2::aes(x = display_feature, y = percent_missing)) +
+  ggplot2::geom_col(fill = "#7b8790") + ggplot2::coord_flip() +
+  ggplot2::scale_x_discrete(labels = function(x) wrap_label(x, 48L)) +
+  ggplot2::labs(x = NULL, y = "Percent missing",
+    caption = "Don't know and Not applicable are recorded categorical states, not missing values.") +
+  theme_feature()
+```
+
+## Consistency findings
+
+Consistency findings preserve questionnaire and child-record discrepancies for
+review. Counts do not expose case identifiers or source values.
+
+```{r, results='asis'}
+severity <- p$consistency[p$consistency$summary_level == "severity_total", , drop = FALSE]
+severity_display <- data.frame(
+  Severity = severity$severity, Findings = fmt_integer(severity$n_findings),
+  `Cases affected` = fmt_integer(severity$n_cases), check.names = FALSE
+)
+cat(table_html(severity_display, "epi-table-compact"))
+```
+
+```{r, fig.height=5.5, fig.width=10}
+findings <- p$consistency[p$consistency$summary_level == "finding", , drop = FALSE]
+if (nrow(findings) == 0L) {
+  plot.new(); text(0.5, 0.5, "No consistency findings recorded")
+} else {
+  key <- paste(findings$domain_label, findings$finding_type, findings$severity, sep = "\r")
+  sums <- rowsum(as.numeric(findings$n_findings), key, reorder = FALSE)
+  parts <- strsplit(rownames(sums), "\r", fixed = TRUE)
+  display <- data.frame(
+    Domain = vapply(parts, `[[`, character(1), 1L),
+    Finding = vapply(parts, `[[`, character(1), 2L),
+    Severity = vapply(parts, `[[`, character(1), 3L),
+    Count = as.numeric(sums[, 1L]), stringsAsFactors = FALSE
+  )
+  display$Label <- wrap_label(paste0(display$Domain, ": ", humanize(display$Finding)), 52L)
+  display$Severity <- factor(display$Severity, levels = c("ERROR", "WARNING", "INFO"))
+  print(ggplot2::ggplot(display, ggplot2::aes(x = Label, y = Count, fill = Severity)) +
+    ggplot2::geom_col() + ggplot2::coord_flip() +
+    ggplot2::scale_fill_manual(values = c(
+      ERROR = "#a94a4a", WARNING = "#9a6b20", INFO = "#557d8b"), drop = FALSE) +
+    ggplot2::labs(x = "Domain and finding type", y = "Findings") + theme_feature())
+}
+```
+
+## Feature dictionary and definitions
+
+Features are grouped using the domain labels supplied by the versioned feature
+dictionary. Derivation code and case-level values are not displayed.
+
+```{r, results='asis'}
+dictionary <- p$feature_dictionary
+for (domain_id in unique(dictionary$domain_id)) {
+  current <- dictionary[dictionary$domain_id == domain_id, , drop = FALSE]
+  cat("### ", current$domain_label[[1L]], "\n\n", sep = "")
+  source <- ifelse(!is.na(current$source_question_id) & nzchar(current$source_question_id),
+    paste0("Question ", current$source_question_id), humanize(current$source_table))
+  display <- data.frame(
+    Feature = humanize(current$feature_name), Label = current$feature_label,
+    Type = humanize(current$feature_type), Source = source,
+    Description = current$description, check.names = FALSE
+  )
+  cat(table_html(display), "\n\n")
+}
+```
+
+## Provenance
+
+```{r, results='asis'}
+provenance <- data.frame(
+  Field = c("Feature summary schema", "Feature version", "Form version",
+    "Feature registry hash", "Source feature manifest status", "Summary status",
+    "bcapture version", "Generated"),
+  Value = c(manifest$feature_summary_schema_version, manifest$feature_version,
+    manifest$form_version, manifest$feature_registry_hash,
+    manifest$source_feature_manifest_status, manifest$status,
+    manifest$package_version, params$generated_at)
+)
+cat(table_html(provenance, "epi-table-compact"))
+```
+
+## Scope boundary and next phase
+
+This review is descriptive only. It contains no regression, odds ratio,
+relative risk, p-value, confidence interval, feature importance, machine
+learning, composite score, risk weight, or causal interpretation.
+
+Before any future modeling, the next phase must begin with an explicit outcome
+definition and contracts for the unit of analysis, sampling frame, candidate
+predictors, potentially post-outcome or endogenous features, and temporal
+ordering.

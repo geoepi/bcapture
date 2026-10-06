@@ -1,0 +1,458 @@
+field,value,field_type,alt_name
+premid,SYN-0001,/Tx,Premises ID
+premname,Synthetic Sunrise Farm,/Tx,Premises Name
+premadd,100 Test Farm Rd,/Tx,Premises Address
+premcnty,Sample County,/Tx,Premises County
+ownname,Alex Example,/Tx,Premises Owner Name
+ownph,555-0101,/Tx,Premises Owner Phone
+owneml,owner@example.org,/Tx,Premises Owner Email
+premlat,38.5000,/Tx,Premises Entrance Latitude
+premlong,-97.2500,/Tx,Premises Entrance Longitude
+amlname,Taylor Example,/Tx,Animal Owner Name
+amladd,200 Demo Ln,/Tx,Animal Owner Address
+amlph,555-0102,/Tx,Animal Owner Phone
+amleml,animal@example.org,/Tx,Animal Owner Email
+weename,Jordan Example,/Tx,Interviewee Name
+weepos,Farm manager,/Tx,Interviewee Position
+weeph,555-0103,/Tx,Interviewee Phone
+weeeml,interviewee@example.org,/Tx,Interviewee Email
+wername,Casey Example,/Tx,Interviewer Name
+werph,555-0104,/Tx,Interviewer Phone
+wereml,interviewer@example.org,/Tx,Interviewer Email
+p0001,08/20/2026,/Tx,Todays Date
+p0002,08/18/2026,/Tx,Date Clinical Signs First Observed
+p0003,07/21/2026,/Tx,28-Days Prior
+p0004,Synthetic mild respiratory signs,/Tx,Description of Clinical Signs
+p0005,12,/Tx,Baseline Mortality Rate
+p0006,37,/Tx,Initial Sampling Mortality Rate
+p0007a,08/03/2026,/Tx,Date
+p0008a,08/10/2026,/Tx,Date
+p0009a,08/12/2026,/Tx,Date
+p0007b,NEG,/Tx,Results
+p0008b,POS,/Tx,Results
+p0009b,NEG,/Tx,Results
+p0007c,ELISA,/Tx,Test Type
+p0008c,ELISA,/Tx,Test Type
+p0009c,ELISA,/Tx,Test Type
+p00010a,H22,/Tx,House ID
+p00011a,H45,/Tx,House ID
+p00012a,H22,/Tx,House ID
+p00013a,H70,/Tx,House ID
+p00014a,H76,/Tx,House ID
+p00015a,H13,/Tx,House ID
+p00016a,H17,/Tx,House ID
+p00010b,Layers,/Tx,Type of Birds
+p00011b,Broilers,/Tx,Type of Birds
+p00012b,Layers,/Tx,Type of Birds
+p00013b,Pullets,/Tx,Type of Birds
+p00014b,Layers,/Tx,Type of Birds
+p00015b,Layers,/Tx,Type of Birds
+p00016b,Pullets,/Tx,Type of Birds
+p00010c,493,/Tx,Number of Birds Today
+p00011c,139,/Tx,Number of Birds Today
+p00012c,229,/Tx,Number of Birds Today
+p00013c,367,/Tx,Number of Birds Today
+p00014c,291,/Tx,Number of Birds Today
+p00015c,354,/Tx,Number of Birds Today
+p00016c,110,/Tx,Number of Birds Today
+p00010d,64,/Tx,Number of Birds Placed
+p00011d,260,/Tx,Number of Birds Placed
+p00012d,145,/Tx,Number of Birds Placed
+p00013d,167,/Tx,Number of Birds Placed
+p00014d,191,/Tx,Number of Birds Placed
+p00015d,287,/Tx,Number of Birds Placed
+p00016d,258,/Tx,Number of Birds Placed
+p00010e,448,/Tx,Age of Birds (in weeks)
+p00011e,235,/Tx,Age of Birds (in weeks)
+p00012e,458,/Tx,Age of Birds (in weeks)
+p00013e,34,/Tx,Age of Birds (in weeks)
+p00014e,388,/Tx,Age of Birds (in weeks)
+p00015e,279,/Tx,Age of Birds (in weeks)
+p00016e,215,/Tx,Age of Birds (in weeks)
+p00010f,Cross,/Tx,Ventilation Type
+p00011f,Cross,/Tx,Ventilation Type
+p00012f,Tunnel,/Tx,Ventilation Type
+p00013f,Cross,/Tx,Ventilation Type
+p00014f,Cross,/Tx,Ventilation Type
+p00015f,Tunnel,/Tx,Ventilation Type
+p00016f,Cross,/Tx,Ventilation Type
+p00010g,08/22/2026,/Tx,Date of Onset of Clinical Signs
+p00011g,08/11/2026,/Tx,Date of Onset of Clinical Signs
+p00012g,08/13/2026,/Tx,Date of Onset of Clinical Signs
+p00013g,08/28/2026,/Tx,Date of Onset of Clinical Signs
+p00014g,08/25/2026,/Tx,Date of Onset of Clinical Signs
+p00015g,08/05/2026,/Tx,Date of Onset of Clinical Signs
+p00016g,08/23/2026,/Tx,Date of Onset of Clinical Signs
+p00010h,South,/Tx,Location in House Where Clinical Signs Observed
+p00011h,South,/Tx,Location in House Where Clinical Signs Observed
+p00012h,North,/Tx,Location in House Where Clinical Signs Observed
+p00013h,South,/Tx,Location in House Where Clinical Signs Observed
+p00014h,North,/Tx,Location in House Where Clinical Signs Observed
+p00015h,North,/Tx,Location in House Where Clinical Signs Observed
+p00016h,Center,/Tx,Location in House Where Clinical Signs Observed
+p00017,245,/Tx,Total Eggs Present
+p00018,1680,/Tx,Eggs Laid in Last Week
+p00020a,Person-0020a,/Tx,Name of Veterinarian
+p00021a,SYN-0021a,/Tx,Depopulation Method
+p0019,/1,/Btn,Eggs for Research
+p0020,/1,/Btn,Do You Have Veterinarian
+p0021,/3,/Btn,Depopulation Plan
+p0022,/3,/Btn,Excercised or Used This Method
+p0100na,/Yes,/Btn,Composting NA
+p0100off,/Yes,/Btn,Composting Off-site
+p0100on,/Yes,/Btn,Composting On-site
+p0100oth,451,/Tx,Distance to Nearest Barn
+p0100a,08/13/2026,/Tx,Dates Composted
+p0100b,TestCo-0100b,/Tx,Company Name and Location
+p0100c,Haul-0100c,/Tx,Transporter Company Name
+p0101on,/Yes,/Btn,Burial On-site
+p0102on,/Off,/Btn,Incineration On-site
+p0101oth,9,/Tx,Distance to Nearest Barn
+p0102oth,250,/Tx,Distance to Nearest Barn
+p0101off,/Yes,/Btn,Burial Off-site
+p0101na,/Yes,/Btn,Burial NA
+p0101a,08/17/2026,/Tx,Dates Buried
+p0101b,TestCo-0101b,/Tx,Company Name and Location
+p0101c,Haul-0101c,/Tx,Transporter Company Name
+p0102off,/Yes,/Btn,Incineration Off-site
+p0102na,/Yes,/Btn,Incineration NA
+p0103na,/Yes,/Btn,Rendering NA
+p0104na,/Yes,/Btn,Landfill NA
+p0103off,/Off,/Btn,Rendering Off-site
+p0102a,08/03/2026,/Tx,Dates Incinerated
+p0102b,TestCo-0102b,/Tx,Company Name and Location
+p0102c,Haul-0102c,/Tx,Transporter Company Name
+p0103a,08/25/2026,/Tx,Dates Transported
+p0104a,08/15/2026,/Tx,Dates Transported
+p0103b,TestCo-0103b,/Tx,Company Name and Location
+p0103c,Haul-0103c,/Tx,Transporter Company Name
+p0104c,Haul-0104c,/Tx,Transporter Company Name
+p0105,Synthetic test p0105,/Tx,Other
+p0106,/1,/Btn,Carcass Bin
+p0106a,/3,/Btn,Kept Covered
+p0104b,TestCo-0104b,/Tx,Company Name and Location
+p0106b,399,/Tx,Distance to Nearest Barn
+p0106c,/3,/Btn,Bin Shared
+p0107,Synthetic test p0107,/Tx,Broken Eggs
+p0108,Synthetic test p0108,/Tx,Wash Water
+p0109,TestCo-p0109,/Tx,Company Name and Location
+p0110,TestCo-p0110,/Tx,Company Name and Location
+p0111,TestCo-p0111,/Tx,Company Name and Location
+p0109a,08/18/2026,/Tx,Date
+p0110a,08/24/2026,/Tx,Date
+p0109d,/1,/Btn,Type
+p0110d,/3,/Btn,Type
+p0111d,/2,/Btn,Type
+p0111a,08/08/2026,/Tx,Date
+p0113,/1,/Btn,Wild Birds
+p0114,/3,/Btn,Wild Animals
+p0115,/1,/Btn,Manure from Another Premises
+p0120,/3,/Btn,Contract Workers
+p0112,488,/Tx,Yards
+p0116,Litter,/Tx,Product
+p0117,Eggs,/Tx,Product
+p0118,Feed,/Tx,Product
+p0119,Eggs,/Tx,Product
+p0116a,TestCo-0116a,/Tx,Source
+p0117a,TestCo-0117a,/Tx,Source
+p0118a,TestCo-0118a,/Tx,Source
+p0119a,TestCo-0119a,/Tx,Source
+p0116b,08/15/2026,/Tx,Date
+p0117b,08/21/2026,/Tx,Date
+p0118b,08/14/2026,/Tx,Date
+p0119b,08/26/2026,/Tx,Date
+p0127,/3,/Btn,Crews Enter Premises
+p0124,/3,/Btn,Community Living
+p0122,/3,/Btn,Visited Other Premises
+p0121,555-4356,/Tx,Name and Phone Number
+p0123,Person-p0123,/Tx,Name
+p0123a,Manager,/Tx,Person Title
+p0123b,08/25/2026,/Tx,Date
+p0104off,/Off,/Btn,Lanfill Off-site
+p0125a,/Yes,/Btn,Poultry
+p0123i,Person-0123i,/Tx,Name
+p0126,TestCo-p0126,/Tx,Other Facilities
+p0125b,/Off,/Btn,Cattle Dairy
+p0125c,/Yes,/Btn,Cattle Beef
+p0125d,/Off,/Btn,Swine
+p0125e,/Off,/Btn,Goat Dairy
+p0125f,/Yes,/Btn,Goat Meat
+p0125g,/Yes,/Btn,Sheep
+p0132a,/Off,/Btn,Poultry
+p0132b,/Yes,/Btn,Cattle Dairy
+p0132c,/Yes,/Btn,Cattle Beef
+p0132d,/Yes,/Btn,Swine
+p0132e,/Yes,/Btn,Goat Dairy
+p0132f,/Yes,/Btn,Goat Meat
+p0132g,/Off,/Btn,Sheep
+p0123c,Person-0123c,/Tx,Name
+p0123f,Person-0123f,/Tx,Name
+p0123d,Tech,/Tx,Person Title
+p0123g,Tech,/Tx,Person Title
+p0123j,Manager,/Tx,Person Title
+p0123e,08/10/2026,/Tx,Date
+p0123h,08/28/2026,/Tx,Date
+p0123k,08/11/2026,/Tx,Date
+p0128,08/10/2026,/Tx,Date
+p0129,08/12/2026,/Tx,Date
+p0130,08/26/2026,/Tx,Date
+p0131a,Load,/Tx,Crew Type
+p0130a,Vacc,/Tx,Crew Type
+p0129a,Load,/Tx,Crew Type
+p0128a,Vacc,/Tx,Crew Type
+p0131b,555-8924,/Tx,Name/Company/Phone Number
+p0130b,555-5903,/Tx,Name/Company/Phone Number
+p0129b,555-1635,/Tx,Name/Company/Phone Number
+p0128b,555-7009,/Tx,Name/Company/Phone Number
+p0133,/3,/Btn,Visit Premises
+p0131,08/22/2026,/Tx,Date
+p0133a,08/15/2026,/Tx,Date
+p0133c,/1,/Btn,Enter Barn
+p0133b,555-1151,/Tx,Name/Company/Phone Number
+p0134,/1,/Btn,Visit Premises
+p0134a,08/03/2026,/Tx,Date
+p0134b,555-5470,/Tx,Name/Company/Phone Number
+p0134c,/1,/Btn,Enter Barn
+p0135,/3,/Btn,Visit Premises
+p0135a,08/11/2026,/Tx,Date
+p0135b,555-9712,/Tx,Name/Company/Phone Number
+p0135c,/3,/Btn,Enter Barn
+p0136,/1,/Btn,Visit Premises
+p0136a,08/03/2026,/Tx,Date
+p0136b,555-5954,/Tx,Name/Company/Phone Number
+p0136c,/3,/Btn,Enter Barn
+p0137,/1,/Btn,Visit Premises
+p0137a,08/09/2026,/Tx,Date
+p0137b,555-4536,/Tx,Name/Company/Phone Number
+p0137c,/1,/Btn,Enter Barn
+p0138,/1,/Btn,Visit Premises
+p0138a,08/18/2026,/Tx,Date
+p0138b,555-3469,/Tx,Name/Company/Phone Number
+p0138c,/1,/Btn,Enter Barn
+p0139,/3,/Btn,Visit Premises
+p0139a,08/03/2026,/Tx,Date
+p0139b,555-8347,/Tx,Name/Company/Phone Number
+p0139c,/3,/Btn,Enter Barn
+p0140,/1,/Btn,Visit Premises
+p0140a,08/17/2026,/Tx,Date
+p0140b,555-9493,/Tx,Name/Company/Phone Number
+p0140c,/1,/Btn,Enter Barn
+p0141,/1,/Btn,Visit Premises
+p0141a,08/17/2026,/Tx,Date
+p0141b,555-3902,/Tx,Name/Company/Phone Number
+p0141c,/1,/Btn,Enter Barn
+p0142,/1,/Btn,Visit Premises
+p0142a,08/06/2026,/Tx,Date
+p0142b,555-1511,/Tx,Name/Company/Phone Number
+p0142c,/1,/Btn,Enter Barn
+p0143,/3,/Btn,Visit Premises
+p0143a,08/02/2026,/Tx,Date
+p0143b,555-4392,/Tx,Name/Company/Phone Number
+p0143c,/3,/Btn,Enter Barn
+p0144,/3,/Btn,Visit Premises
+p0144a,08/09/2026,/Tx,Date
+p0144b,555-7804,/Tx,Name/Company/Phone Number
+p0144c,/3,/Btn,Enter Barn
+p0145,/3,/Btn,Visit Premises
+p0145a,08/09/2026,/Tx,Date
+p0145b,555-5004,/Tx,Name/Company/Phone Number
+p0145c,/3,/Btn,Enter Barn
+p0146,/3,/Btn,Visit Premises
+p0146a,08/03/2026,/Tx,Date
+p0146b,555-7370,/Tx,Name/Company/Phone Number
+p0146c,/1,/Btn,Enter Barn
+p0147,/3,/Btn,Visit Premises
+p0147a,08/19/2026,/Tx,Date
+p0147b,555-9090,/Tx,Name/Company/Phone Number
+p0147c,/3,/Btn,Enter Barn
+p0148,/1,/Btn,Visit Premises
+p0148a,08/22/2026,/Tx,Date
+p0148b,555-8421,/Tx,Name/Company/Phone Number
+p0148c,/3,/Btn,Enter Barn
+p0149,/1,/Btn,Visit Premises
+p0149a,08/10/2026,/Tx,Date
+p0149b,555-4796,/Tx,Name/Company/Phone Number
+p0149c,/1,/Btn,Enter Barn
+p0150,/1,/Btn,Visit Premises
+p0150c,/3,/Btn,Enter Barn
+p0150a,08/21/2026,/Tx,Date
+p0150b,555-6511,/Tx,Name/Company/Phone Number
+p0151a,/3,/Btn,Received or Loaned
+p0151b,555-9669,/Tx,Name/Company/Phone Number
+p0151c,08/01/2026,/Tx,Date
+p0152a,/1,/Btn,Received or Loaned
+p0152b,555-1899,/Tx,Name/Company/Phone Number
+p0152c,08/20/2026,/Tx,Date
+p0153a,/3,/Btn,Received or Loaned
+p0153b,555-3591,/Tx,Name/Company/Phone Number
+p0153c,08/12/2026,/Tx,Date
+p0154a,/1,/Btn,Received or Loaned
+p0154b,555-8614,/Tx,Name/Company/Phone Number
+p0154c,08/10/2026,/Tx,Date
+p0155a,/3,/Btn,Received or Loaned
+p0155b,555-4417,/Tx,Name/Company/Phone Number
+p0155c,08/08/2026,/Tx,Date
+p0156a,/3,/Btn,Received or Loaned
+p0156b,555-3617,/Tx,Name/Company/Phone Number
+p0156c,08/01/2026,/Tx,Date
+p0157a,/3,/Btn,Received or Loaned
+p0157b,555-1949,/Tx,Name/Company/Phone Number
+p0157c,08/07/2026,/Tx,Date
+p0158a,/1,/Btn,Received or Loaned
+p0158b,555-8846,/Tx,Name/Company/Phone Number
+p0158c,08/02/2026,/Tx,Date
+p0159a,/3,/Btn,Received or Loaned
+p0159b,555-3720,/Tx,Name/Company/Phone Number
+p0159c,08/23/2026,/Tx,Date
+p0160a,/1,/Btn,Received or Loaned
+p0160b,555-2580,/Tx,Name/Company/Phone Number
+p0160c,08/13/2026,/Tx,Date
+p0161a,/3,/Btn,Received or Loaned
+p0161b,555-7575,/Tx,Name/Company/Phone Number
+p0161c,08/16/2026,/Tx,Date
+p0162a,/3,/Btn,Received or Loaned
+p0162b,555-4948,/Tx,Name/Company/Phone Number
+p0162c,08/03/2026,/Tx,Date
+p0163a,/3,/Btn,Received or Loaned
+p0163b,555-3566,/Tx,Name/Company/Phone Number
+p0163c,08/25/2026,/Tx,Date
+p0164a,/1,/Btn,Received or Loaned
+p0164b,555-8489,/Tx,Name/Company/Phone Number
+p0164c,08/18/2026,/Tx,Date
+p0165a,/1,/Btn,Received or Loaned
+p0165c,08/07/2026,/Tx,Date
+p0150oth,Synthetic test 50oth,/Tx,Other
+p0165oth,Synthetic test 65oth,/Tx,Other
+p0166,/3,/Btn,Birds Introduced
+p0172,/1,/Btn,Birds Moved
+p0165b,555-4916,/Tx,Name/Company/Phone Number
+p0167a,Broilers,/Tx,Bird Type
+p0167,08/27/2026,/Tx,Date
+p0167b,TestCo-0167b,/Tx,Source
+p0167c,Haul-0167c,/Tx,Transported By
+p0168,08/07/2026,/Tx,Date
+p0168a,Pullets,/Tx,Bird Type
+p0168b,TestCo-0168b,/Tx,Source
+p0168c,Haul-0168c,/Tx,Transported By
+p0169,08/10/2026,/Tx,Date
+p0169a,Broilers,/Tx,Bird Type
+p0169b,TestCo-0169b,/Tx,Source
+p0169c,Haul-0169c,/Tx,Transported By
+p0170,08/21/2026,/Tx,Date
+p0170a,Broilers,/Tx,Bird Type
+p0170b,TestCo-0170b,/Tx,Source
+p0170c,Haul-0170c,/Tx,Transported By
+p0171,08/02/2026,/Tx,Date
+p0171a,Pullets,/Tx,Bird Type
+p0171b,TestCo-0171b,/Tx,Source
+p0171c,Haul-0171c,/Tx,Transported By
+p0173,08/11/2026,/Tx,Date
+p0173a,Pullets,/Tx,Bird Type
+p0173b,TestCo-0173b,/Tx,Destination
+p0173c,Haul-0173c,/Tx,Transported By
+p0174,08/05/2026,/Tx,Date
+p0174a,Broilers,/Tx,Bird Type
+p0174b,TestCo-0174b,/Tx,Destination
+p0174c,Haul-0174c,/Tx,Transported By
+p0175,08/02/2026,/Tx,Date
+p0175a,Layers,/Tx,Bird Type
+p0175b,TestCo-0175b,/Tx,Destination
+p0175c,Haul-0175c,/Tx,Transported By
+p0176,08/04/2026,/Tx,Date
+p0176a,Layers,/Tx,Bird Type
+p0176b,TestCo-0176b,/Tx,Destination
+p0176c,Haul-0176c,/Tx,Transported By
+p0177,08/04/2026,/Tx,Date
+p0177a,Pullets,/Tx,Bird Type
+p0177c,Haul-0177c,/Tx,Transported By
+p0186,/3,/Btn,Egg Products Moved
+p0181,/1,/Btn,Eggs Moved
+p0178,/3,/Btn,Eggs Moved
+p0179,/1,/Btn,Contract Crew
+p0180,/3,/Btn,Farm Equipment
+p0182b,/2,/Btn,Description of Eggs
+p0177b,TestCo-0177b,/Tx,Destination
+p0179oth,Person-79oth,/Tx,Company/Crew Name
+p0180oth,Synthetic test 80oth,/Tx,Describe
+p0182,TestCo-p0182,/Tx,Source Name and Location
+p0182a,08/16/2026,/Tx,Date
+p0183b,/1,/Btn,Description of Eggs
+p0184b,/3,/Btn,Description of Eggs
+p0185b,/3,/Btn,Description of Eggs
+p0185,TestCo-p0185,/Tx,Source Name and Location
+p0185a,08/28/2026,/Tx,Date
+p0184,TestCo-p0184,/Tx,Source Name and Location
+p0184a,08/23/2026,/Tx,Date
+p0183,TestCo-p0183,/Tx,Source Name and Location
+p0183a,08/03/2026,/Tx,Date
+p0187b,/1,/Btn,Description of Egg Products
+p0188b,/1,/Btn,Description of Egg Products
+p0189b,/1,/Btn,Description of Egg Products
+p0189,TestCo-p0189,/Tx,Source Name and Location
+p0189a,08/02/2026,/Tx,Date
+p0190,TestCo-p0190,/Tx,Source Name and Location
+p0190a,08/18/2026,/Tx,Date
+p0190b,/2,/Btn,Description of Egg Products
+p0187,TestCo-p0187,/Tx,Source Name and Location
+p0187a,08/10/2026,/Tx,Date
+p0188,TestCo-p0188,/Tx,Source Name and Location
+p0188a,08/08/2026,/Tx,Date
+p0191,/1,/Btn,Eggs Moved
+p0192,TestCo-p0192,/Tx,Source Name and Location
+p0192a,08/05/2026,/Tx,Date
+p0192b,/3,/Btn,Description of Eggs
+p0193,TestCo-p0193,/Tx,Source Name and Location
+p0193a,08/11/2026,/Tx,Date
+p0193b,/3,/Btn,Description of Eggs
+p0194,TestCo-p0194,/Tx,Source Name and Location
+p0194a,08/23/2026,/Tx,Date
+p0194b,/3,/Btn,Description of Eggs
+p0195,TestCo-p0195,/Tx,Source Name and Location
+p0195a,08/27/2026,/Tx,Date
+p0195b,/1,/Btn,Description of Eggs
+p0196,/3,/Btn,Egg Products Moved
+p0197,TestCo-p0197,/Tx,Source Name and Location
+p0197a,08/12/2026,/Tx,Date
+p0197b,/1,/Btn,Description of Egg Products
+p0198,TestCo-p0198,/Tx,Source Name and Location
+p0198a,08/01/2026,/Tx,Date
+p0198b,/2,/Btn,Description of Egg Products
+p0199b,/2,/Btn,Description of Egg Products
+p0199,TestCo-p0199,/Tx,Source Name and Location
+p0199a,08/23/2026,/Tx,Date
+p0200a,08/03/2026,/Tx,Date
+p0200b,/2,/Btn,Description of Egg Products
+p0300,/1,/Btn,Domestic Birds Outdoors
+p0301,/3,/Btn,Water Bodies
+p0302,/3,/Btn,Unfrozen Water
+p0303,/4,/Btn,Ducks
+p0304,/1,/Btn,Geese
+p0305,/4,/Btn,Shorebirds
+p0306,/4,/Btn,Other
+p0310,/3,/Btn,Ducks
+p0200,TestCo-p0200,/Tx,Source Name and Location
+p0306oth,Synthetic test 06oth,/Tx,Other
+p0311,/3,/Btn,Geese
+p0312,/3,/Btn,Shorebirds
+p0313,/3,/Btn,Other
+p0309,/3,/Btn,Field Worked
+p0308,/3,/Btn,Field Tilled
+p0307,349,/Tx,Yards
+p0314,/3,/Btn,Supplemental Feed
+p0315,/2,/Btn,Waterfowl
+p0316,/3,/Btn,Gulls
+p0317,/3,/Btn,Other Water Birds
+p0318,/2,/Btn,Small Perching Birds
+p0319,/2,/Btn,Blackbirds Crows
+p0320,/3,/Btn,Turkeys etc
+p0321,/2,/Btn,Raptors
+p0322,/2,/Btn,Pigeons Doves
+p0323,/3,/Btn,Other
+p0313oth,Synthetic test 13oth,/Tx,Other
+p0326,/1,/Btn,Wild Birds
+p0327,/1,/Btn,Wild Mammals
+p0328,/3,/Btn,Additional Info
+p0325,/1,/Btn,Wildlife Plan
+p0324,/1,/Btn,Wild Mammals
+If Yes describe p0328oth,Synthetic test 28oth,/Tx,"If Yes, describe: p0328oth"
+p0323oth,Synthetic test 23oth,/Tx,Other

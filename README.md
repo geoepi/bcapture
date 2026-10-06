@@ -8,8 +8,8 @@
 `bcapture` provides tools for extracting, organizing, validating, summarizing,
 and viewing data from Biosecurity Compliance Audit Program (bCAP) forms.
 
-The current development version focuses on structured extraction from
-electronically completed HPAI BCAP PDF forms. See the package documentation
+The current development version focuses on structured extraction from HPAI
+BCAP and Initial Epi PDF forms. See the package documentation
 and [the output contract](docs/output-structure.md) for details.
 
 ## Purpose
@@ -29,9 +29,11 @@ only when an extraction function is called.
 
 ## Python dependency
 
-Extraction requires Python and the `pypdf` package. `bcapture` requests
-`pypdf` lazily through reticulate and does not initialize Python when the
-package is loaded. No Python pandas dependency is used.
+Extraction requires Python and the `pypdf` package. Recognized selectable-text
+flattened PDFs additionally use `pdfplumber` and `pypdfium2` for spatial text
+and rendered-control evidence. `bcapture` requests these packages lazily
+through reticulate and does not initialize Python when the package is loaded.
+No Python pandas dependency is used.
 
 ## Quick start
 
@@ -70,6 +72,19 @@ features <- derive_epi_features(
   deidentified_dir = "epi_analysis"
 )
 
+feature_summary <- summarize_epi_features(features)
+
+plot_epi_features(
+  feature_summary,
+  domain = "environment_wildlife",
+  type = "prevalence"
+)
+
+feature_report <- render_epi_report(
+  deidentified_dir = "epi_analysis",
+  report = "features"
+)
+
 plot_epi_validation(
   summary,
   type = "status"
@@ -91,7 +106,7 @@ The Initial Epi workflow branches after de-identification:
 ```text
 PDF -> extract -> collate -> validate -> de-identify
                                       |-> summarize -> visualize -> report
-                                      `-> derive features -> future epidemiological analysis
+                                      `-> derive features -> summarize -> visualize -> report
 ```
 
 PDF extraction produces raw AcroForm data, collation produces semantic
@@ -102,7 +117,8 @@ and outside the de-identified output. The analysis profile is for controlled
 use; it is not an unrestricted public-release or irreversible anonymization
 workflow. `summarize_epi()` describes a collection of cases;
 `derive_epi_features()` creates transparent analysis-ready attributes for each
-case. Neither downstream branch is required by the other.
+case, while `summarize_epi_features()` describes those attributes without
+recomputing them. Neither downstream branch is required by the other.
 
 ## Tutorials
 
@@ -114,11 +130,26 @@ For complete synthetic user workflows, see the
 - [Initial Epi de-identification](docs/tutorials/initial-epi-deidentification.md)
 - [Initial Epi descriptive summaries](docs/initial-epi-summaries.md)
 - [Initial Epi analytical features](docs/initial-epi-analytic-features.md)
+- [Initial Epi feature analysis](docs/initial-epi-feature-analysis.md)
+- [Initial Epi feature analysis tutorial](docs/tutorials/initial-epi-feature-analysis.md)
 - [Initial Epi visualization](docs/tutorials/initial-epi-visualization.md)
 - [Initial Epi HTML reporting](docs/tutorials/initial-epi-reporting.md)
 
-The current extractor reads interactive PDF form fields directly. It does not
-use OCR and does not yet extract handwritten values from scanned forms.
+The extractor reads interactive PDF form fields directly when available. The
+supported input classes are:
+
+- canonical interactive Initial Epi and BCAP AcroForm PDFs;
+- selectable-text flattened Initial Epi and BCAP PDFs that register against a
+  packaged, versioned template; and
+- a supported PDF container or Portfolio containing exactly one recognized
+  canonical Initial Epi AcroForm, recovered through guarded in-memory
+  extraction.
+
+The container route is not generic PDF Portfolio support: ambiguous containers,
+multiple candidate forms, nested containers, XFA, unknown attachments, and
+incompatible member signatures fail explicitly. Image-only scans, OCR-only
+inputs, handwritten forms, and arbitrary unrecognized flattened layouts are
+recognized as unsupported; OCR is outside the current extraction scope.
 
 ## Output structure
 
@@ -151,6 +182,9 @@ states, and multi-select flags. `collate_epi("epi_output")` applies the
 versioned 2024-05-28 semantic dictionary and writes analysis-ready scalar and
 repeated relational tables. Use `diagnose_epi("epi_output")` for Epi schema
 diagnostics. Other APHIS/HPAI PDF forms are not implied to be supported.
+Image-only scans and incompatible or unknown signatures are controlled
+unsupported outcomes that require OCR, template, or version review outside
+this package.
 
 ## Schema diagnostics
 
@@ -166,12 +200,43 @@ logical-field presence, field-type, response-state, field-order, and widget
 encoding differences. PDF widget serialization can vary even when forms look
 identical, so no automatic semantic reconciliation is performed.
 
+For Epi batches, `extraction_manifest.csv` is also the route and failure audit:
+it records success or controlled failure, failure class, extraction method,
+template/schema identity, registration evidence where applicable, and PDF
+container/member provenance. A selected embedded member is processed in
+memory; the submitted container remains the source whose checksum is recorded.
+
+## Flattened selectable-text PDFs
+
+The spatial fallback is deliberately template-guided rather than a general
+PDF or OCR parser. Each supported family has an immutable canonical
+interactive/printed pair and derived field, widget, page-geometry, and
+registration metadata under `inst/extdata/templates/`. A successful spatial
+record has `extraction_method = "spatial_template"` in metadata and
+`spatial_text`/`spatial_mark` at field level. Its observed `form_schema_hash`
+is `NA`; `canonical_template_schema_hash` identifies the versioned logical
+schema, and `number_of_source_widgets` is zero because flattened PDFs no
+longer contain source widgets. Registration quality, anchor agreement, field
+regions, and evidence classes are retained for auditability.
+
+The fallback rejects page-count or layout mismatches, image-only inputs, and
+ambiguous control states. Mixed batches can contain AcroForm and spatial
+records; diagnostics use the canonical template hash as the schema identity
+for spatial records so they remain comparable without inventing an observed
+AcroForm hash.
+
 ## Failure handling
 
 Batch extraction performs preflight checks for input files, sanitized audit-ID
 collisions, and existing output directories before writing. A failed PDF does
 not stop the batch; it receives a `failed` manifest row with a useful failure
-type. Flattened or scanned forms are recorded as `no_acroform_fields`.
+type. Scanned, OCR-only, and unrecognized flattened forms are recorded with a
+classified failure such as `no_usable_digital_content`,
+`unrecognized_flattened_form`, or `registration_failed`.
+
+Extraction failures are distinct from semantic review findings. After a
+successful extraction and collation, `validate_epi()` may retain non-blocking
+warnings for source-data anomalies; it does not silently rewrite those values.
 
 ## Current limitations
 

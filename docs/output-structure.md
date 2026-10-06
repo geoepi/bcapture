@@ -55,27 +55,42 @@ row, begins with provenance columns `audit_id`, `source_file`,
 `source_relpath`, `source_md5`, and `form_schema_hash`, and then uses the PDF
 field names as columns without unnecessary semantic recoding.
 
-`extraction_method` is currently `acroform`. Future extraction modes can use
-`ocr`, `handwriting`, or `manual_review` without changing the core table.
+`extraction_method` is `acroform` for interactive documents. Recognized
+flattened documents use `spatial_template` in metadata/manifests and
+`spatial_text` or `spatial_mark` at field level. OCR, handwriting, and manual
+review are not silently substituted.
 
-`number_of_fields` always counts logical fields returned by
-`pypdf.PdfReader.get_fields()`. `number_of_widgets` counts `/Widget`
-annotations encountered across pages. A logical field may have multiple
-widgets, especially for radio/button controls. The widget table is a
-diagnostic representation and is not the canonical analytical extraction.
+For AcroForms, `number_of_fields` counts logical fields returned by
+`pypdf.PdfReader.get_fields()` and `number_of_widgets` counts `/Widget`
+annotations encountered across pages. For spatial records, these are the
+canonical template counts; `number_of_source_widgets` is zero and the widget
+table is empty because the flattened source has no AcroForm annotations. A
+logical canonical field may have multiple widgets, especially for
+radio/button controls.
 
 Field types use the normalized convention `Btn`, `Tx`, `Ch`, and `Sig`.
 
 ## Metadata and manifest
 
 `metadata` has one row per successful PDF with page, field, population, schema,
-checksum, method, pypdf version, and UTC extraction time. Available PDF
+checksum, method, template/registration provenance, pypdf version, and UTC extraction time. Available PDF
 metadata fields are appended with a `pdf_` prefix.
 
 `extraction_manifest.csv` has one row for every input PDF, whether successful
 or failed. A failure has `status = failed` and a useful `failure_type`, such as
-`no_acroform_fields` or `pdf_read_error`; it does not create an empty success
-record. The manifest includes the same provenance fields and extraction counts.
+`no_usable_digital_content`, `unrecognized_flattened_form`,
+`registration_failed`, or `pdf_read_error`; it does not create an empty
+success record. The manifest includes the same provenance fields and
+extraction counts.
+
+For Initial Epi, the manifest and successful metadata distinguish the
+extraction route and its evidence. Template family/version, registration
+method and quality, canonical schema identity, and control evidence describe
+recognized flattened forms. `source_pdf_structure`, container page counts,
+embedded-file counts, and selected-member ordinal/hash describe guarded
+embedded-form recovery. These fields are `NA` when a route fails before that
+evidence is available. The container/member is never written as an extracted
+temporary PDF.
 
 ## Combined products, schema hashes, and diagnostics
 
@@ -85,7 +100,9 @@ of the logical field name, normalized field type, and normalized valid state set
 Fields are sorted by name and states are deduplicated and sorted before hashing;
 field order, page position, current values, and populated status do not affect
 the hash. `schema_group` assigns deterministic human-readable labels such as
-`schema_001` within a batch.
+`schema_001` within a batch. Spatial records use
+`canonical_template_schema_hash` as `schema_identity`; their observed
+`form_schema_hash` remains missing rather than implying AcroForm structure.
 
 `diagnostics/` contains differences rather than another complete extraction.
 It compares field presence, field types, normalized state sets, field ordering,
@@ -102,6 +119,29 @@ them separately from semantic interpretation.
 `populated_fields_long` and `audits_wide` are convenience representations
 derived from the canonical `fields_long` output. They should not replace the
 long table for archival or future semantic collation.
+
+## Initial Epi extraction, semantic findings, and privacy boundary
+
+Initial Epi extraction supports canonical interactive AcroForms, registered
+selectable-text flattened forms, and guarded recovery of a unique canonical
+form embedded in a supported PDF container. Image-only scans and incompatible
+or unknown signatures are controlled unsupported outcomes, not inferred form
+versions. OCR is outside the extraction boundary.
+
+Semantic validation is a separate layer. A readable extraction can produce
+non-blocking `WARNING` findings for source-data anomalies such as missing
+follow-up values, unparseable dates or numerics, and incomplete repeated
+tables. Warnings are review work, not extraction failure; source values are
+retained and are not silently rewritten. Semantic `ERROR` findings remain
+blocking when strict downstream processing requires them.
+
+De-identification creates safe analytical output only after strict privacy
+validation passes. The de-identified output and re-identification crosswalk
+are separate destinations, crosswalk reuse is deterministic, and strict
+failure is fail-closed: safe output and new crosswalk finalization do not
+occur when privacy validation fails. Example paths in tutorials are
+operational choices only; `bcapture` does not require a fixed local data
+directory layout.
 
 ## Initial Epi analytical and reporting outputs
 

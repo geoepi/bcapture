@@ -23,8 +23,10 @@
 test_that("installed report templates and command construction are stable", {
   summary_template <- system.file("quarto", "initial-epi-summary.qmd", package = "bcapture")
   quality_template <- system.file("quarto", "initial-epi-quality.qmd", package = "bcapture")
+  feature_template <- system.file("quarto", "initial-epi-features.qmd", package = "bcapture")
   expect_true(file.exists(summary_template))
   expect_true(file.exists(quality_template))
+  expect_true(file.exists(feature_template))
   expect_match(paste(readLines(summary_template, warn = FALSE), collapse = "\n"),
     "plot_epi_categorical_report")
   expect_match(paste(readLines(summary_template, warn = FALSE), collapse = "\n"),
@@ -33,6 +35,8 @@ test_that("installed report templates and command construction are stable", {
     "plot_epi_numeric_report")
   expect_match(paste(readLines(quality_template, warn = FALSE), collapse = "\n"),
     "plot_epi_validation_report")
+  expect_match(paste(readLines(feature_template, warn = FALSE), collapse = "\n"),
+    "Controlled-use notice")
   args <- bcapture:::.epi_report_quarto_args(
     "C:/path with spaces/template.qmd", "C:/stage with spaces", "report.html",
     "C:/data with spaces/report-params.yml"
@@ -46,6 +50,65 @@ test_that("installed report templates and command construction are stable", {
   expect_match(bcapture:::.epi_report_quarto_env(), "^QUARTO_R=")
   expect_error(bcapture:::.epi_report_find_quarto(""),
     "Quarto is required to render bcapture HTML reports but was not found on PATH.")
+})
+
+test_that("feature report is minimized self-contained private and atomic", {
+  skip_if(Sys.which("quarto") == "", "Quarto unavailable")
+  skip_if_not_installed("ggplot2")
+  deidentified_dir <- .feature_analysis_fixture()
+  bcapture::derive_epi_features(deidentified_dir, write = TRUE, quiet = TRUE)
+  bcapture::summarize_epi_features(deidentified_dir, write = TRUE, quiet = TRUE)
+  source_roots <- file.path(deidentified_dir,
+    c("collated", "validation", "privacy", "summary", "features"))
+  source_files <- unlist(lapply(source_roots, function(root) {
+    if (dir.exists(root)) fs::dir_ls(root, recurse = TRUE, type = "file") else character()
+  }), use.names = FALSE)
+  before <- stats::setNames(as.character(tools::md5sum(source_files)),
+    fs::path_rel(source_files, deidentified_dir))
+
+  prepared <- bcapture:::.epi_report_read_products(deidentified_dir, "features")
+  expect_false("case_id" %in% names(prepared$products$distribution_data))
+  expect_equal(nrow(prepared$products$feature_dictionary), 40L)
+  result <- bcapture::render_epi_report(
+    deidentified_dir, report = "features", quiet = TRUE
+  )
+  expect_equal(result$status, "rendered")
+  html_file <- file.path(deidentified_dir, "reports", "initial_epi_features.html")
+  expect_true(file.exists(html_file))
+  expect_gt(file.info(html_file)$size, 1000)
+  expect_false(dir.exists(paste0(html_file, "_files")))
+  html <- paste(readLines(html_file, warn = FALSE), collapse = "\n")
+  expect_match(html, "Initial Epi Analytical Feature Review")
+  expect_match(html, "Controlled-use notice")
+  expect_match(html, "They are not risk scores and do not imply causation")
+  expect_match(html, "Feature overview")
+  expect_match(html, "Domain coverage")
+  expect_match(html, "Binary feature prevalence")
+  expect_match(html, "Categorical feature distributions")
+  expect_match(html, "Count and numeric features")
+  expect_match(html, "Feature missingness")
+  expect_match(html, "Consistency findings")
+  expect_match(html, "Feature dictionary and definitions")
+  expect_match(html, "outcome definition")
+  expect_true(grepl("epi-table-scroll", html, fixed = TRUE))
+  forbidden <- c("CASE-", "PREMISES-", "PERSON-", "ORG-", "ENTITY-",
+    "CONTACT-", "LOCATION-", "Synthetic Owner", "Synthetic Farm")
+  expect_false(any(vapply(forbidden, grepl, logical(1), x = html, fixed = TRUE)))
+  after <- stats::setNames(as.character(tools::md5sum(source_files)),
+    fs::path_rel(source_files, deidentified_dir))
+  expect_identical(before, after)
+  report_manifest <- readr::read_csv(
+    file.path(deidentified_dir, "reports", "report_manifest.csv"),
+    show_col_types = FALSE
+  )
+  expect_equal(report_manifest$report_type, "features")
+  expect_equal(report_manifest$report_file, "initial_epi_features.html")
+  expect_error(bcapture::render_epi_report(
+    deidentified_dir, report = "features", quiet = TRUE
+  ), "Report output already exists")
+  expect_silent(bcapture::render_epi_report(
+    deidentified_dir, report = "features", overwrite = TRUE, quiet = TRUE
+  ))
 })
 
 test_that("report input gates require complete, compatible summary products", {

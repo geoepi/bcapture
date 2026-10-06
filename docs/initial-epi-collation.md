@@ -10,6 +10,11 @@ metadata. `collate_epi()` reads that canonical long product plus the extraction
 manifest and metadata. It does not re-run extraction and does not use the
 convenience wide or populated-only products as its source.
 
+Collation is not extraction validation: a successful extraction can still
+produce semantic parse diagnostics or later validation findings. Raw source
+values remain available for review, and normalization occurs before typed
+semantic interpretation without rewriting the raw extraction products.
+
 ## Dictionary versioning
 
 The supported source form is the USDA/APHIS **HPAI Response / Initial
@@ -49,6 +54,19 @@ never first accepted as a literal year such as 0025. Failed scalar parsing
 yields a typed `NA` and a diagnostic in
 `collation_parse_diagnostics.csv`; the original text is retained.
 
+Numeric parsing accepts ungrouped decimal values (including a leading decimal
+such as `.5`) and conventional thousands grouping only when every
+comma-delimited integer group has exactly three digits. Commas are removed only
+after the complete value matches that grammar; mixed or malformed numeric text
+remains available as an unparsed raw value.
+
+Interactive multi-select values can be emitted by PDF libraries as ordinary
+delimited text or as a quoted JSON/Python-style string array. Collation decodes
+only a strict top-level array of scalar strings for the derived
+`epi_multiselect_responses.csv` rows. The original extraction value and
+`raw_value` are preserved, and malformed arrays remain a single unknown item so
+validation can report it.
+
 The dictionary distinguishes scalar `date` fields from `date_text`. The latter
 is used where the printed form permits date(s), multiple dates, a range,
 recurrence, or descriptive scheduling text. `date_text` values remain
@@ -68,6 +86,10 @@ records unknown fields in `collation_manifest.csv` and
 `dictionary_coverage.csv`. Schema hashes are retained as provenance and
 diagnostic information but are not required to match; semantic matching is by
 the supported raw field name.
+
+Repeated-table validation resolves `raw_field` provenance only from dictionary
+rows with complete table, column, and row-index metadata. Missing metadata rows
+and missing row labels cannot displace a valid match.
 
 The source form identifies study data as Confidential Business Information.
 Never commit populated PDFs, extracted respondent data, real premises IDs,

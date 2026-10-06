@@ -47,7 +47,14 @@ empty_field_table <- function() {
     field_flags = integer(), value_raw = character(), value = character(),
     default_value_raw = character(), default_value = character(), is_default_value = logical(),
     states = character(), options = character(), is_multiselect = logical(),
-    is_populated = logical(), extraction_method = character()
+    is_populated = logical(), extraction_method = character(),
+    extraction_status = character(), evidence_class = character(),
+    ambiguity_reason = character(), source_page = integer(),
+    source_region_x1 = double(), source_region_y1 = double(),
+    source_region_x2 = double(), source_region_y2 = double(),
+    registration_method = character(), registration_quality = character(),
+    registration_residual_pt = double(), template_family = character(),
+    template_version = character()
   )
 }
 
@@ -62,7 +69,7 @@ empty_widget_table <- function() {
   )
 }
 
-field_rows_to_tibble <- function(rows) {
+field_rows_to_tibble <- function(rows, extraction_method = "acroform") {
   if (length(rows) == 0L) return(empty_field_table())
   purrr::map_dfr(rows, function(row) {
     tibble::tibble(
@@ -80,7 +87,21 @@ field_rows_to_tibble <- function(rows) {
       states = as_optional_character(row$states %||% NA_character_),
       options = as_optional_character(row$options %||% NA_character_),
       is_multiselect = isTRUE(row$is_multiselect),
-      is_populated = isTRUE(row$is_populated), extraction_method = "acroform"
+      is_populated = isTRUE(row$is_populated),
+      extraction_method = as_optional_character(row$extraction_method %||% extraction_method),
+      extraction_status = as_optional_character(row$extraction_status),
+      evidence_class = as_optional_character(row$evidence_class),
+      ambiguity_reason = as_optional_character(row$ambiguity_reason),
+      source_page = as.integer(row$source_page %||% NA_integer_),
+      source_region_x1 = as.numeric(row$source_region_x1 %||% NA_real_),
+      source_region_y1 = as.numeric(row$source_region_y1 %||% NA_real_),
+      source_region_x2 = as.numeric(row$source_region_x2 %||% NA_real_),
+      source_region_y2 = as.numeric(row$source_region_y2 %||% NA_real_),
+      registration_method = as_optional_character(row$registration_method),
+      registration_quality = as_optional_character(row$registration_quality),
+      registration_residual_pt = as.numeric(row$registration_residual_pt %||% NA_real_),
+      template_family = as_optional_character(row$template_family),
+      template_version = as_optional_character(row$template_version)
     )
   })
 }
@@ -142,7 +163,14 @@ bind_union_rows <- function(tables) {
 }
 
 failure_type_from_error <- function(error) {
+  classified <- tryCatch(as.character(error$failure_type), error = function(...) character())
+  if (length(classified) == 1L && !is.na(classified) &&
+      grepl("^[a-z][a-z0-9_]+$", classified)) return(classified)
   message <- conditionMessage(error)
+  if (grepl("page count|static layout agreement|recognized flattened form", message, ignore.case = TRUE)) return("unrecognized_flattened_form")
+  if (grepl("registration|geometry", message, ignore.case = TRUE)) return("registration_failed")
+  if (grepl("usable digital|selectable digital|image-only|image only", message, ignore.case = TRUE)) return("no_usable_digital_content")
+  if (grepl("ambiguous|multiple_selected", message, ignore.case = TRUE)) return("ambiguous_reconstruction")
   if (grepl("no AcroForm fields", message, ignore.case = TRUE)) return("no_acroform_fields")
   if (grepl("cannot read|invalid pdf|PdfReader|pypdf", message, ignore.case = TRUE)) return("pdf_read_error")
   if (grepl("output", message, ignore.case = TRUE)) return("output_exists")

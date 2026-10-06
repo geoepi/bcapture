@@ -107,6 +107,62 @@ test_that("collate_epi preserves codebooks, provenance, and repeated records", {
   expect_true(file.exists(file.path(out_dir, "collated", "collation_diagnostics.md")))
 })
 
+test_that("quoted multiselect arrays are decoded without changing ordinary delimiters", {
+  expect_equal(
+    bcapture:::.epi_multiselect_items("['Poultry', 'Cattle Dairy']"),
+    c("Poultry", "Cattle Dairy")
+  )
+  expect_equal(
+    bcapture:::.epi_multiselect_items('["Poultry", "Cattle Dairy"]'),
+    c("Poultry", "Cattle Dairy")
+  )
+  expect_equal(
+    bcapture:::.epi_multiselect_items('["A\\\"B", \'C\\\\D\']'),
+    c('A"B', "C\\D")
+  )
+  expect_equal(
+    bcapture:::.epi_multiselect_items('["Poultry; Cattle Dairy", "Swine|Sheep"]'),
+    c("Poultry; Cattle Dairy", "Swine|Sheep")
+  )
+  expect_length(bcapture:::.epi_multiselect_items("[]"), 0L)
+  expect_equal(bcapture:::.epi_multiselect_items("Poultry|Swine"), c("Poultry", "Swine"))
+
+  escaped_nul <- '["Poultry\\u0000"]'
+  expect_identical(bcapture:::.epi_multiselect_items(escaped_nul), escaped_nul)
+  malformed <- c("['Poultry',]", "[['Poultry']]", '["Poultry", 1]', '["Poultry"] trailing', escaped_nul)
+  for (value in malformed) expect_identical(bcapture:::.epi_multiselect_items(value), value)
+
+  out_dir <- .synthetic_epi_output(list(synthetic_1 = list(
+    p0139d = "['Poultry', 'Cattle Dairy']"
+  )))
+  result <- collate_epi(out_dir, quiet = TRUE)
+  expect_setequal(
+    result$multiselect$item_label[result$multiselect$raw_field == "p0139d"],
+    c("Poultry", "Cattle Dairy")
+  )
+  expect_equal(result$visitors$other_livestock_premises_type_raw, "['Poultry', 'Cattle Dairy']")
+  extracted <- readr::read_csv(
+    file.path(out_dir, "combined", "epi_fields_long.csv"),
+    show_col_types = FALSE
+  )
+  expect_equal(extracted$value_raw[extracted$field == "p0139d"], "['Poultry', 'Cattle Dairy']")
+})
+
+test_that("quoted multiselect parsing enforces decoded bounds and full consumption", {
+  expect_null(bcapture:::.epi_multiselect_string_array(
+    '["\\u0061\\u0062"]', max_item_chars = 1L
+  ))
+  expect_null(bcapture:::.epi_multiselect_string_array(
+    '["a", "b", "c"]', max_items = 2L
+  ))
+  expect_null(bcapture:::.epi_multiselect_string_array(
+    '["a"] trailing'
+  ))
+  expect_null(bcapture:::.epi_multiselect_string_array(
+    '["a"]', max_chars = 4L
+  ))
+})
+
 test_that("blank repeated rows are omitted and schema hashes are provenance only", {
   out_dir <- .synthetic_epi_output(
     values = list(synthetic_1 = list(premid = "ONE"), synthetic_2 = list(premid = "TWO")),
@@ -195,6 +251,39 @@ test_that("repeated-table numerics remain double across valid, blank, and invali
   expect_equal(cast$data$birds_today, c(15, NA_real_, NA_real_))
   expect_equal(nrow(cast$diagnostics), 1L)
   expect_equal(cast$diagnostics$parse_type, "numeric")
+})
+
+test_that("numeric parsing accepts only ungrouped or well-grouped decimal values", {
+  expect_equal(bcapture:::.epi_parse_numeric("1,234"), 1234)
+  expect_equal(bcapture:::.epi_parse_numeric("-1,234.50"), -1234.5)
+  expect_equal(bcapture:::.epi_parse_numeric("+12.5"), 12.5)
+  expect_equal(bcapture:::.epi_parse_numeric(".5"), 0.5)
+  expect_equal(bcapture:::.epi_parse_numeric("+.5"), 0.5)
+  expect_equal(bcapture:::.epi_parse_numeric("-.5"), -0.5)
+  expect_equal(bcapture:::.epi_parse_numeric(".0"), 0)
+  expect_true(all(is.na(vapply(
+    c("1,23", "1,23,456", "1,000,", "/1,000.", ".", "+.", "-.", "1.",
+      "1,000.", ",5", "1,5", "1e3", "50%", "5 yards", "1° 2'"),
+    bcapture:::.epi_parse_numeric, numeric(1)
+  ))))
+
+  out_dir <- .synthetic_epi_output(list(synthetic_1 = list(
+    p0005 = "1,234", p00010a = "House 1", p00010c = "1,234"
+  )))
+  result <- collate_epi(out_dir, quiet = TRUE)
+  expect_equal(result$responses$numeric_value[result$responses$raw_field == "p0005"], 1234)
+  expect_equal(result$responses$raw_value[result$responses$raw_field == "p0005"], "1,234")
+  expect_equal(result$houses$birds_today, 1234)
+  expect_equal(result$houses$birds_today_raw, "1,234")
+  expect_equal(nrow(result$parse_diagnostics), 0L)
+
+  invalid <- .synthetic_epi_output(list(synthetic_1 = list(
+    p0005 = "1,23", p00010a = "House 1", p00010c = "1,23,456"
+  )))
+  invalid_result <- collate_epi(invalid, quiet = TRUE)
+  expect_true(all(is.na(invalid_result$houses$birds_today)))
+  expect_equal(sort(invalid_result$parse_diagnostics$raw_field), c("p00010c"))
+  expect_equal(invalid_result$responses$numeric_value[invalid_result$responses$raw_field == "p0005"], NA_real_)
 })
 
 test_that("all date-bearing repeated tables use a stable Date column", {

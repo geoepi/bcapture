@@ -30,6 +30,98 @@
   as.character(raw)
 }
 
+.epi_multiselect_string_array <- function(value, max_chars = 10000L, max_items = 256L, max_item_chars = 2000L) {
+  value <- as.character(value)
+  if (length(value) == 0L || is.na(value) || !nzchar(value)) return(NULL)
+  if (nchar(value, type = "chars") > max_chars || substr(value, 1L, 1L) != "[") return(NULL)
+  n <- nchar(value, type = "chars")
+  if (n < 2L || substr(value, n, n) != "]") return(NULL)
+
+  whitespace <- function(character) character %in% c(" ", "\t", "\r", "\n")
+  index <- 2L
+  skip_whitespace <- function() {
+    while (index < n && whitespace(substr(value, index, index))) index <<- index + 1L
+  }
+  decode_escape <- function(escape) {
+    if (escape %in% c("\\", "'", '"', "/")) return(escape)
+    if (escape == "b") return("\b")
+    if (escape == "f") return("\f")
+    if (escape == "n") return("\n")
+    if (escape == "r") return("\r")
+    if (escape == "t") return("\t")
+    NULL
+  }
+
+  items <- character()
+  skip_whitespace()
+  if (index == n) return(items)
+  repeat {
+    skip_whitespace()
+    if (index >= n || !substr(value, index, index) %in% c("'", '"')) return(NULL)
+    quote <- substr(value, index, index)
+    index <- index + 1L
+    characters <- character()
+    closed <- FALSE
+    while (index < n) {
+      character <- substr(value, index, index)
+      if (character == quote) {
+        index <- index + 1L
+        closed <- TRUE
+        break
+      }
+      if (character == "\\") {
+        if (index + 1L >= n) return(NULL)
+        escaped <- substr(value, index + 1L, index + 1L)
+        decoded <- decode_escape(escaped)
+        if (!is.null(decoded)) {
+          characters <- c(characters, decoded)
+          index <- index + 2L
+          next
+        }
+        if (escaped == "u" && index + 5L < n) {
+          hex <- substr(value, index + 2L, index + 5L)
+          if (!grepl("^[0-9A-Fa-f]{4}$", hex, perl = TRUE)) return(NULL)
+          codepoint <- strtoi(hex, base = 16L)
+          if (is.na(codepoint) || codepoint == 0L || codepoint >= 0xD800L && codepoint <= 0xDFFF) return(NULL)
+          characters <- c(characters, intToUtf8(codepoint))
+          index <- index + 6L
+          next
+        }
+        return(NULL)
+      }
+      if (utf8ToInt(character)[[1L]] < 32L) return(NULL)
+      characters <- c(characters, character)
+      index <- index + 1L
+      if (length(characters) > max_item_chars) return(NULL)
+    }
+    if (!closed || length(characters) > max_item_chars) return(NULL)
+    items <- c(items, paste0(characters, collapse = ""))
+    if (length(items) > max_items) return(NULL)
+    skip_whitespace()
+    if (index > n) return(NULL)
+    separator <- substr(value, index, index)
+    if (separator == "]") {
+      index <- index + 1L
+      skip_whitespace()
+      return(if (index <= n) NULL else items)
+    }
+    if (separator != ",") return(NULL)
+    index <- index + 1L
+    skip_whitespace()
+    if (index >= n || substr(value, index, index) == "]") return(NULL)
+  }
+}
+
+.epi_multiselect_items <- function(raw) {
+  normalized <- .epi_normalized_raw(raw)
+  if (is.na(normalized)) return(character())
+  if (startsWith(normalized, "[")) {
+    parsed <- .epi_multiselect_string_array(normalized)
+    return(if (is.null(parsed)) normalized else parsed)
+  }
+  unlist(strsplit(normalized, "\\s*[|;,]\\s*"), use.names = FALSE)
+}
+
 .epi_value <- function(x) {
   value <- if ("value" %in% names(x)) x$value[[1L]] else NA_character_
   if (length(value) == 0L || is.na(value)) return(NA_character_)
@@ -59,8 +151,12 @@
 .epi_parse_numeric <- function(value) {
   value <- as.character(value)
   if (length(value) == 0L || is.na(value) || !nzchar(trimws(value))) return(NA_real_)
-  if (!grepl("^\\s*[+-]?[0-9]+([.][0-9]+)?\\s*$", value)) return(NA_real_)
-  as.numeric(trimws(value))
+  value <- trimws(value)
+  grouped <- "[0-9]{1,3}(,[0-9]{3})+"
+  ungrouped <- "[0-9]+"
+  grammar <- paste0("^[+-]?(?:(?:", ungrouped, "|", grouped, ")(?:[.][0-9]+)?|[.][0-9]+)$")
+  if (!grepl(grammar, value, perl = TRUE)) return(NA_real_)
+  as.numeric(gsub(",", "", value, fixed = TRUE))
 }
 
 .epi_parse_date_vector <- function(values) {
@@ -227,7 +323,7 @@ validate_epi_table_types <- function(table_name, table, dictionary) {
     raw <- .epi_normalized_raw(.epi_raw_value(row))
     if (is.na(raw) || raw %in% c("Off", epi_placeholder_values)) return(tibble::tibble())
     group <- row$raw_field[[1L]] %in% group_fields
-    items <- if (group) raw else unlist(strsplit(raw, "\\s*[|;,]\\s*"))
+    items <- if (group) raw else .epi_multiselect_items(raw)
     items <- items[nzchar(items) & !items %in% epi_placeholder_values]
     if (length(items) == 0L) return(tibble::tibble())
     tibble::tibble(
