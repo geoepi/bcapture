@@ -11,6 +11,9 @@
   failures and attempted extraction routes, and omitted unrepresentable NUL
   metadata with an omission indicator. Logical field strings are never repaired.
 
+* Reduced repeated button-diagnostic comparisons while preserving ordered
+  candidate rows, states, and geometric evidence.
+
 * Added versioned template-guided extraction for selectable-text flattened
   Initial Epi and BCAP PDFs, with page-registration provenance, rendered
   control-mark evidence, explicit failure classes, and mixed-batch route

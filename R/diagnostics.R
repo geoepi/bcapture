@@ -303,16 +303,24 @@ diagnose_acroform_batch <- function(out_dir, id_col = "audit_id", form_label = "
   button_fields <- dplyr::filter(fields, field_type == "Btn")
   if (nrow(button_fields) < 2L) return(tibble::tibble())
   button_fields <- dplyr::mutate(button_fields, suffix = sub("^[^_]+_[^_]+_", "", field))
+  # State semantics depend only on the row, not on the companion row.
+  states <- lapply(button_fields$states, normalize_state_set)
+  is_split <- vapply(states, function(x) "Off" %in% x && any(c("Yes", "No") %in% x), logical(1))
+  complete <- vapply(states, function(x) all(c("Yes", "No") %in% x), logical(1))
+  eligible <- which(is_split | complete)
+  if (length(eligible) < 2L) return(tibble::tibble())
+  groups <- split(eligible, button_fields$suffix[eligible])
+  widget_index <- if (nrow(widgets) > 0L) match(button_fields$field, widgets$full_field_name) else integer()
   candidates <- list()
-  for (i in seq_len(nrow(button_fields))) {
-    for (j in seq_len(nrow(button_fields))) {
-      if (i == j || button_fields$suffix[[i]] != button_fields$suffix[[j]]) next
-      states_i <- normalize_state_set(button_fields$states[[i]])
-      states_j <- normalize_state_set(button_fields$states[[j]])
-      split_i <- "Off" %in% states_i && any(c("Yes", "No") %in% states_i)
-      split_j <- "Off" %in% states_j && any(c("Yes", "No") %in% states_j)
-      complete_i <- all(c("Yes", "No") %in% states_i)
-      complete_j <- all(c("Yes", "No") %in% states_j)
+  for (i in eligible) {
+    for (j in groups[[button_fields$suffix[[i]]]]) {
+      if (i == j) next
+      states_i <- states[[i]]
+      states_j <- states[[j]]
+      split_i <- is_split[[i]]
+      split_j <- is_split[[j]]
+      complete_i <- complete[[i]]
+      complete_j <- complete[[j]]
       complementary_split <- split_i && split_j &&
         length(intersect(states_i, c("Yes", "No"))) > 0L &&
         length(intersect(states_j, c("Yes", "No"))) > 0L &&
@@ -323,8 +331,8 @@ diagnose_acroform_batch <- function(out_dir, id_col = "audit_id", form_label = "
       page <- first$page
       geometry_note <- "Widget geometry unavailable."
       if (nrow(widgets) > 0L) {
-        first_widget <- widgets[match(first$field, widgets$full_field_name), , drop = FALSE]
-        second_widget <- widgets[match(second$field, widgets$full_field_name), , drop = FALSE]
+        first_widget <- widgets[widget_index[[i]], , drop = FALSE]
+        second_widget <- widgets[widget_index[[j]], , drop = FALSE]
         if (nrow(first_widget) > 0L && nrow(second_widget) > 0L && !is.na(first_widget$page[[1L]])) {
           page <- first_widget$page[[1L]]
           same_page <- identical(first_widget$page[[1L]], second_widget$page[[1L]])
