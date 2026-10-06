@@ -72,7 +72,7 @@ extract_spatial_pdf <- function(pdf_file, form_type) {
   module <- ensure_spatial_python()
   parsed <- tryCatch(
     reticulate::py_to_r(module$extract_spatial(pdf_file, spatial_template_dir(form_type))),
-    error = function(error) stop(conditionMessage(error), call. = FALSE)
+    error = function(error) stop(error)
   )
   parsed
 }

@@ -29,4 +29,6 @@ lazily only when this function is invoked. Interactive AcroForm fields are
 preferred. Recognized selectable-text flattened PDFs use the versioned
 spatial template; scanned, OCR-only, handwritten, and unrecognized
 flattened PDFs fail explicitly.
+XFA and PDF containers fail explicitly. Structurally identified non-PDF
+C2PA provenance manifests preserve normal standalone routing.
 }

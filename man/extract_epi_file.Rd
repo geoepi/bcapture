@@ -27,4 +27,5 @@ Interactive AcroForm fields are preferred. A versioned,
 selectable-text flattened PDF is reconstructed against the packaged
 canonical template when no AcroForm fields are present. Scanned, OCR-only,
 handwritten, and unrecognized flattened PDFs fail explicitly.
+PDF containers use the same selection and provenance rules as \code{\link[=extract_epi]{extract_epi()}}.
 }

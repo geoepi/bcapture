@@ -14,6 +14,8 @@
 #'   preferred. Recognized selectable-text flattened PDFs use the versioned
 #'   spatial template; scanned, OCR-only, handwritten, and unrecognized
 #'   flattened PDFs fail explicitly.
+#'   XFA and PDF containers fail explicitly. Structurally identified non-PDF
+#'   C2PA provenance manifests preserve normal standalone routing.
 #' @export
 extract_hpai_file <- function(pdf_file, out_dir, overwrite = FALSE, quiet = FALSE) {
   pdf_file <- validate_scalar_path(pdf_file, "pdf_file")
@@ -49,6 +51,8 @@ extract_hpai_file <- function(pdf_file, out_dir, overwrite = FALSE, quiet = FALS
 #'   empty successful records. One failed PDF does not stop the remaining
 #'   batch. The output directory is rebuilt from successful extractions in the
 #'   current invocation.
+#'   XFA and PDF containers are unsupported for BCAP; recognized non-PDF C2PA
+#'   provenance manifests do not change standalone routing.
 #' @examples
 #' \dontrun{
 #' result <- extract_hpai("completed_audits", "bcapture_output")
@@ -117,7 +121,11 @@ extract_hpai <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, 
   tryCatch({
     module <- ensure_hpai_python()
     parsed <- reticulate::py_to_r(module$extract_form(pdf_file))
+    base_manifest$number_of_pages <- as.integer(parsed$number_of_pages)
+    base_manifest$number_of_fields <- as.integer(parsed$number_of_fields)
+    base_manifest$number_of_widgets <- as.integer(parsed$number_of_widgets)
     if (!isTRUE(parsed$has_acroform_fields)) {
+      base_manifest$extraction_method <- "spatial_template"
       spatial_parsed <- extract_spatial_pdf(pdf_file, "bcap")
       tables <- spatial_result_tables(
         spatial_parsed, audit_id, "bcap", source_file, source_relpath,
@@ -165,7 +173,6 @@ extract_hpai <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, 
     list(audit_id = audit_id, status = "success", fields = fields, populated_fields = populated, wide = wide, metadata = metadata, widgets = widgets, output_dir = paths$dir, manifest = as_single_row_tibble(manifest))
   }, error = function(error) {
     manifest <- base_manifest
-    if (exists("parsed", inherits = FALSE) && !isTRUE(parsed$has_acroform_fields)) manifest$extraction_method <- "spatial_template"
     manifest$failure_type <- failure_type_from_error(error)
     manifest$error <- conditionMessage(error)
     if (!quiet) cli::cli_alert_warning("{source_file}: {manifest$failure_type}")

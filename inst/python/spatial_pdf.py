@@ -9,6 +9,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import pypdf
+from acroform import _pdf_metadata
 
 
 class SpatialExtractionError(RuntimeError):
@@ -43,12 +44,7 @@ def _read_csv(path):
 
 
 def _metadata(reader):
-    result = {}
-    for key, value in (reader.metadata or {}).items():
-        key = str(key).lstrip("/").lower()
-        key = "".join(character if character.isalnum() else "_" for character in key)
-        result["pdf_" + key] = str(value)
-    return result
+    return _pdf_metadata(reader)
 
 
 def _load_template(template_dir):
@@ -318,13 +314,13 @@ def extract_spatial(pdf_path, template_dir):
         raise SpatialExtractionError("pdf_read_error", f"Could not read PDF: {error}") from error
     if reader.get_fields():
         raise SpatialExtractionError("acroform_fields_present", "Spatial extraction is only a fallback for PDFs without AcroForm fields.")
-    if len(reader.pages) != int(manifest["printed_page_count"]):
-        raise SpatialExtractionError("unrecognized_flattened_form", "Page count does not match the canonical printed template.")
     source_reader = pypdf.PdfReader(str(source_path))
     with pdfplumber.open(str(incoming_path)) as incoming_pdf, pdfplumber.open(str(blank_path)) as blank_pdf:
         character_count = sum(len(page.chars) for page in incoming_pdf.pages)
         if character_count < 50:
             raise SpatialExtractionError("no_usable_digital_content", "The PDF has no usable selectable digital text layer for spatial extraction.")
+        if len(reader.pages) != int(manifest["printed_page_count"]):
+            raise SpatialExtractionError("unrecognized_flattened_form", "Page count does not match the canonical printed template.")
         for page, expected in zip(incoming_pdf.pages, template["pages"]):
             if abs(float(page.width) - float(expected["printed_width"])) > 2 or abs(float(page.height) - float(expected["printed_height"])) > 2:
                 raise SpatialExtractionError("registration_failed", "Incoming page geometry is outside the canonical printed-template tolerance.")

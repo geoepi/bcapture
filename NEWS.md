@@ -1,5 +1,16 @@
 # bcapture 0.0.0.9000
 
+* Added conservative in-memory Initial Epi Portfolio/embedded-PDF extraction
+  for a unique canonical interactive form, with submitted-container and selected
+  member provenance. Ambiguous aggregates, duplicate logical fields, XFA,
+  encrypted/unreadable attachments, and unsupported member schemas fail explicitly.
+  BCAP containers remain unsupported. Recognized C2PA provenance manifests
+  preserve standalone AcroForm and flattened extraction.
+
+* Classified scans before spatial page-count checks, retained typed Python
+  failures and attempted extraction routes, and omitted unrepresentable NUL
+  metadata with an omission indicator. Logical field strings are never repaired.
+
 * Added versioned template-guided extraction for selectable-text flattened
   Initial Epi and BCAP PDFs, with page-registration provenance, rendered
   control-mark evidence, explicit failure classes, and mixed-batch route

@@ -37,4 +37,21 @@ Interactive AcroForm fields are preferred. Recognized flattened
 selectable-text PDFs use the versioned spatial template for this form
 family; mixed batches retain route-specific provenance. Scanned, OCR-only,
 handwritten, and unrecognized flattened PDFs remain failures.
+A PDF Portfolio or embedded-file container is supported only when it has
+no top-level fields and exactly one embedded AcroForm matching the registered
+interactive page count, canonical schema, field count, and widget count.
+All other embedded PDFs must be readable and field-free; their total page
+count plus the container pages must be below the registered printed form
+page count. This conservative bound does not identify supplemental content
+or guarantee that short fragments cannot contain another form.
+Multiple forms, extra pages on a standalone Initial Epi AcroForm, nested
+containers, XFA, and unknown non-PDF attachments fail explicitly.
+Structurally identified non-PDF C2PA manifests preserve standalone routing.
+
+Raw manifest and metadata columns \code{source_pdf_structure},
+\code{source_container_pages}, and \code{embedded_file_count} describe the submitted
+PDF; \code{embedded_pdf_ordinal} and \code{embedded_pdf_sha256} identify the selected
+member without writing it to disk. \code{source_sha256} always hashes the
+submitted PDF, whereas \code{number_of_pages}, fields, and widgets describe the
+selected member. Unavailable failure provenance is \code{NA}.
 }

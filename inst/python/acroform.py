@@ -4,6 +4,7 @@ import hashlib
 import json
 
 import pypdf
+from pdf_structure import audited_fields, PDFStructureError, extract_epi_document, standalone_preflight
 
 
 def _deref(value):
@@ -188,11 +189,23 @@ def get_page_field_map(reader):
 
 def _pdf_metadata(reader):
     result = {}
+    omitted = []
     metadata = reader.metadata or {}
     for key, value in metadata.items():
-        key = pdf_value_to_string(key).lstrip("/").lower()
+        raw_key = pdf_value_to_string(key)
+        if "\x00" in raw_key:
+            omitted.append("unrepresentable_metadata_key")
+            continue
+        key = raw_key.lstrip("/").lower()
         key = "".join(character if character.isalnum() else "_" for character in key)
-        result["pdf_" + key] = pdf_value_to_string(value)
+        converted = pdf_value_to_string(value)
+        if converted is not None and "\x00" in converted:
+            omitted.append("pdf_" + key)
+        else:
+            result["pdf_" + key] = converted
+    if omitted:
+        result["pdf_metadata_omitted_nul_count"] = len(omitted)
+        result["pdf_metadata_omitted_nul_keys"] = "|".join(sorted(omitted))
     return result
 
 
@@ -225,9 +238,20 @@ def pypdf_version():
 
 def extract_form(pdf_path):
     reader = pypdf.PdfReader(pdf_path)
+    standalone_preflight(reader)
+    return _extract_reader(reader)
+
+
+def extract_epi_form(pdf_path, interactive_page_count, printed_page_count,
+                     canonical_field_count, canonical_widget_count, canonical_schema_hash):
+    return extract_epi_document(pdf_path, interactive_page_count, printed_page_count,
+                                canonical_field_count, canonical_widget_count, canonical_schema_hash)
+
+
+def _extract_reader(reader):
+    form_fields = audited_fields(reader)
     page_map = get_page_field_map(reader)
     widgets = extract_widgets(reader)
-    form_fields = reader.get_fields() or {}
     fields = []
     for field_index, (field_name, field) in enumerate(form_fields.items(), start=1):
         field_name = pdf_value_to_string(field_name)
@@ -258,6 +282,9 @@ def extract_form(pdf_path):
             "is_multiselect": is_multiselect(field_flags, field_type),
             "is_populated": is_populated,
         })
+    for row in fields + widgets:
+        if any(isinstance(value, str) and "\x00" in value for value in row.values()):
+            raise PDFStructureError("unsupported_pdf_string", "A logical field or widget contains an unrepresentable PDF string.")
     return {
         "has_acroform_fields": bool(form_fields),
         "number_of_pages": len(reader.pages),

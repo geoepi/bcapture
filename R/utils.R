@@ -163,6 +163,9 @@ bind_union_rows <- function(tables) {
 }
 
 failure_type_from_error <- function(error) {
+  classified <- tryCatch(as.character(error$failure_type), error = function(...) character())
+  if (length(classified) == 1L && !is.na(classified) &&
+      grepl("^[a-z][a-z0-9_]+$", classified)) return(classified)
   message <- conditionMessage(error)
   if (grepl("page count|static layout agreement|recognized flattened form", message, ignore.case = TRUE)) return("unrecognized_flattened_form")
   if (grepl("registration|geometry", message, ignore.case = TRUE)) return("registration_failed")

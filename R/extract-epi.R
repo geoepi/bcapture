@@ -77,6 +77,7 @@ epi_combined_output_paths <- function(out_dir) {
 #'   selectable-text flattened PDF is reconstructed against the packaged
 #'   canonical template when no AcroForm fields are present. Scanned, OCR-only,
 #'   handwritten, and unrecognized flattened PDFs fail explicitly.
+#'   PDF containers use the same selection and provenance rules as [extract_epi()].
 #' @export
 extract_epi_file <- function(pdf_file, out_dir, overwrite = FALSE, quiet = FALSE) {
   pdf_file <- validate_scalar_path(pdf_file, "pdf_file")
@@ -105,6 +106,23 @@ extract_epi_file <- function(pdf_file, out_dir, overwrite = FALSE, quiet = FALSE
 #'   selectable-text PDFs use the versioned spatial template for this form
 #'   family; mixed batches retain route-specific provenance. Scanned, OCR-only,
 #'   handwritten, and unrecognized flattened PDFs remain failures.
+#'   A PDF Portfolio or embedded-file container is supported only when it has
+#'   no top-level fields and exactly one embedded AcroForm matching the registered
+#'   interactive page count, canonical schema, field count, and widget count.
+#'   All other embedded PDFs must be readable and field-free; their total page
+#'   count plus the container pages must be below the registered printed form
+#'   page count. This conservative bound does not identify supplemental content
+#'   or guarantee that short fragments cannot contain another form.
+#'   Multiple forms, extra pages on a standalone Initial Epi AcroForm, nested
+#'   containers, XFA, and unknown non-PDF attachments fail explicitly.
+#'   Structurally identified non-PDF C2PA manifests preserve standalone routing.
+#'
+#'   Raw manifest and metadata columns `source_pdf_structure`,
+#'   `source_container_pages`, and `embedded_file_count` describe the submitted
+#'   PDF; `embedded_pdf_ordinal` and `embedded_pdf_sha256` identify the selected
+#'   member without writing it to disk. `source_sha256` always hashes the
+#'   submitted PDF, whereas `number_of_pages`, fields, and widgets describe the
+#'   selected member. Unavailable failure provenance is `NA`.
 #' @export
 extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, diagnostics = TRUE, quiet = FALSE) {
   in_dir <- validate_scalar_path(in_dir, "in_dir")
@@ -166,10 +184,28 @@ extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, d
   source_hash <- source_sha256(pdf_file)
   extracted_at <- utc_now()
   base_manifest <- list(form_id = form_id, form_type = "initial_epi", source_file = source_file, source_relpath = as.character(source_relpath), source_sha256 = source_hash, status = "failed", failure_type = NA_character_, error = NA_character_, number_of_pages = NA_integer_, number_of_fields = NA_integer_, number_of_widgets = NA_integer_, number_of_source_widgets = NA_integer_, number_of_canonical_fields = NA_integer_, number_of_canonical_widgets = NA_integer_, number_of_populated_fields = NA_integer_, form_schema_hash = NA_character_, source_form_schema_hash = NA_character_, canonical_template_schema_hash = NA_character_, schema_identity = NA_character_, schema_group = NA_character_, extraction_method = "acroform", extraction_status = NA_character_, template_family = NA_character_, template_version = NA_character_, registration_method = NA_character_, registration_quality = NA_character_, registration_residual_pt = NA_real_, anchor_fraction = NA_real_, control_threshold = NA_real_, pypdf_version = NA_character_, extracted_at_utc = extracted_at)
+  base_manifest <- c(base_manifest, list(source_pdf_structure = NA_character_,
+    source_container_pages = NA_integer_, embedded_file_count = NA_integer_,
+    embedded_pdf_ordinal = NA_integer_, embedded_pdf_sha256 = NA_character_))
   tryCatch({
     module <- ensure_acroform_python()
-    parsed <- reticulate::py_to_r(module$extract_form(pdf_file))
+    template_manifest <- readr::read_csv(
+      fs::path(spatial_template_dir("initial_epi"), "manifest.csv"), show_col_types = FALSE
+    )
+    parsed <- reticulate::py_to_r(module$extract_epi_form(
+      pdf_file, as.integer(template_manifest$interactive_page_count[[1L]]),
+      as.integer(template_manifest$printed_page_count[[1L]]),
+      as.integer(template_manifest$canonical_field_count[[1L]]),
+      as.integer(template_manifest$canonical_widget_count[[1L]]),
+      template_manifest$canonical_schema_hash[[1L]]
+    ))
+    provenance <- epi_document_provenance(parsed)
+    base_manifest[names(provenance)] <- provenance
+    base_manifest$number_of_pages <- as.integer(parsed$number_of_pages)
+    base_manifest$number_of_fields <- as.integer(parsed$number_of_fields)
+    base_manifest$number_of_widgets <- as.integer(parsed$number_of_widgets)
     if (!isTRUE(parsed$has_acroform_fields)) {
+      base_manifest$extraction_method <- "spatial_template"
       spatial_parsed <- extract_spatial_pdf(pdf_file, "initial_epi")
       tables <- spatial_result_tables(
         spatial_parsed, form_id, "initial_epi", source_file, source_relpath,
@@ -178,11 +214,13 @@ extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, d
       paths <- epi_output_paths(form_id, out_dir)
       if (dir.exists(paths$dir) && isTRUE(overwrite)) unlink(paths$dir, recursive = TRUE, force = TRUE)
       if (dir.exists(paths$dir)) stop("Output directory already exists.", call. = FALSE)
+      tables$metadata <- dplyr::bind_cols(tables$metadata, as_single_row_tibble(provenance))
       write_spatial_outputs(tables, paths)
       manifest <- spatial_manifest_values(
         spatial_parsed, form_id, "initial_epi", source_file, source_relpath,
         source_hash, "form_id", "source_sha256"
       )
+      manifest <- dplyr::bind_cols(manifest, as_single_row_tibble(provenance))
       return(list(form_id = form_id, status = "success", fields = tables$fields,
         populated_fields = tables$populated_fields, wide = tables$wide,
         metadata = tables$metadata, widgets = tables$widgets,
@@ -196,7 +234,7 @@ extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, d
     populated <- fields[fields$is_populated %in% TRUE, , drop = FALSE]
     choice <- fields$field_type == "Ch"
     metadata_values <- c(list(form_id = form_id, form_type = "initial_epi", source_file = source_file, source_relpath = as.character(source_relpath), source_sha256 = source_hash, number_of_pages = as.integer(parsed$number_of_pages), number_of_fields = nrow(fields), number_of_widgets = nrow(widgets), number_of_populated_fields = nrow(populated), number_of_choice_fields = sum(choice, na.rm = TRUE), number_of_multiselect_fields = sum(fields$is_multiselect %in% TRUE, na.rm = TRUE), form_schema_hash = as_optional_character(parsed$form_schema_hash), schema_group = NA_character_, extraction_method = "acroform", pypdf_version = hpai_python_version(module), extracted_at_utc = extracted_at), parsed$pdf_metadata %||% list())
-    metadata <- as_single_row_tibble(metadata_values)
+    metadata <- as_single_row_tibble(c(metadata_values, provenance))
     wide_values <- c(list(form_id = form_id, form_type = "initial_epi", source_file = source_file, source_relpath = as.character(source_relpath), source_sha256 = source_hash, form_schema_hash = as_optional_character(parsed$form_schema_hash), schema_group = NA_character_), stats::setNames(as.list(fields$value), fields$field))
     wide <- as_single_row_tibble(wide_values)
     paths <- epi_output_paths(form_id, out_dir)
@@ -219,12 +257,21 @@ extract_epi <- function(in_dir, out_dir, recursive = FALSE, overwrite = FALSE, d
     list(form_id = form_id, status = "success", fields = fields, populated_fields = populated, wide = wide, metadata = metadata, widgets = widgets, output_dir = paths$dir, manifest = as_single_row_tibble(manifest))
   }, error = function(error) {
     manifest <- base_manifest
-    if (exists("parsed", inherits = FALSE) && !isTRUE(parsed$has_acroform_fields)) manifest$extraction_method <- "spatial_template"
     manifest$failure_type <- failure_type_from_error(error)
     manifest$error <- conditionMessage(error)
     if (!quiet) cli::cli_alert_warning("{source_file}: {manifest$failure_type}")
     list(form_id = form_id, status = "failed", fields = NULL, populated_fields = NULL, wide = NULL, metadata = NULL, widgets = NULL, output_dir = NA_character_, error = manifest$error, manifest = as_single_row_tibble(manifest))
   })
+}
+
+epi_document_provenance <- function(parsed) {
+  list(
+    source_pdf_structure = as_optional_character(parsed$source_pdf_structure),
+    source_container_pages = as.integer(parsed$source_container_pages %||% NA_integer_),
+    embedded_file_count = as.integer(parsed$embedded_file_count %||% 0L),
+    embedded_pdf_ordinal = as.integer(parsed$embedded_pdf_ordinal %||% NA_integer_),
+    embedded_pdf_sha256 = as_optional_character(parsed$embedded_pdf_sha256)
+  )
 }
 
 .set_epi_schema_group <- function(result, schema_group, out_dir) {
