@@ -9,7 +9,7 @@ jobs:
   R-CMD-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: r-lib/actions/setup-pandoc@v2
       - uses: r-lib/actions/setup-r@v2
         with:
@@ -23,7 +23,7 @@ jobs:
       - name: Verify Python dependencies
         run: |
           python --version
-          python -c "import pypdf, pdfplumber, pypdfium2; print('pypdf', pypdf.__version__); print('pdfplumber', pdfplumber.__version__); print('pypdfium2', pypdfium2.__version__)"
+          python -c "from importlib.metadata import version; import pypdf, pdfplumber, pypdfium2; print('pypdf', version('pypdf')); print('pdfplumber', version('pdfplumber')); print('pypdfium2', version('pypdfium2'))"
       - name: Configure reticulate Python
         shell: Rscript {0}
         run: |
