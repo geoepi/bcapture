@@ -10,6 +10,11 @@ metadata. `collate_epi()` reads that canonical long product plus the extraction
 manifest and metadata. It does not re-run extraction and does not use the
 convenience wide or populated-only products as its source.
 
+Collation is not extraction validation: a successful extraction can still
+produce semantic parse diagnostics or later validation findings. Raw source
+values remain available for review, and normalization occurs before typed
+semantic interpretation without rewriting the raw extraction products.
+
 ## Dictionary versioning
 
 The supported source form is the USDA/APHIS **HPAI Response / Initial

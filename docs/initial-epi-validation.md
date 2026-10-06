@@ -71,6 +71,14 @@ Parse validation applies only to fields declared as scalar `date` or
 text and are not warned on merely because they contain multiple dates,
 recurrence, or descriptive scheduling language.
 
+Normalization precedes semantic interpretation where the representation is
+unambiguous. Strict top-level quoted string lists are decoded generically for
+multi-select rows, and only closed numeric grammars (including well-formed
+three-digit grouping and leading decimals) are normalized before parsing.
+Malformed lists, malformed grouping, units, coordinates, and other ambiguous
+text remain unparseable so that validation can retain a review finding rather
+than silently infer a value.
+
 With `strict = FALSE`, all findings are returned. With `strict = TRUE`, all
 findings are still written and returned, but an `ERROR` finding emits a warning
 to signal failed strict validation. Warnings do not stop processing.

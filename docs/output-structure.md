@@ -83,6 +83,15 @@ or failed. A failure has `status = failed` and a useful `failure_type`, such as
 success record. The manifest includes the same provenance fields and
 extraction counts.
 
+For Initial Epi, the manifest and successful metadata distinguish the
+extraction route and its evidence. Template family/version, registration
+method and quality, canonical schema identity, and control evidence describe
+recognized flattened forms. `source_pdf_structure`, container page counts,
+embedded-file counts, and selected-member ordinal/hash describe guarded
+embedded-form recovery. These fields are `NA` when a route fails before that
+evidence is available. The container/member is never written as an extracted
+temporary PDF.
+
 ## Combined products, schema hashes, and diagnostics
 
 Combined products row-bind successful per-audit products and use union-of-
@@ -110,6 +119,29 @@ them separately from semantic interpretation.
 `populated_fields_long` and `audits_wide` are convenience representations
 derived from the canonical `fields_long` output. They should not replace the
 long table for archival or future semantic collation.
+
+## Initial Epi extraction, semantic findings, and privacy boundary
+
+Initial Epi extraction supports canonical interactive AcroForms, registered
+selectable-text flattened forms, and guarded recovery of a unique canonical
+form embedded in a supported PDF container. Image-only scans and incompatible
+or unknown signatures are controlled unsupported outcomes, not inferred form
+versions. OCR is outside the extraction boundary.
+
+Semantic validation is a separate layer. A readable extraction can produce
+non-blocking `WARNING` findings for source-data anomalies such as missing
+follow-up values, unparseable dates or numerics, and incomplete repeated
+tables. Warnings are review work, not extraction failure; source values are
+retained and are not silently rewritten. Semantic `ERROR` findings remain
+blocking when strict downstream processing requires them.
+
+De-identification creates safe analytical output only after strict privacy
+validation passes. The de-identified output and re-identification crosswalk
+are separate destinations, crosswalk reuse is deterministic, and strict
+failure is fail-closed: safe output and new crosswalk finalization do not
+occur when privacy validation fails. Example paths in tutorials are
+operational choices only; `bcapture` does not require a fixed local data
+directory layout.
 
 ## Initial Epi analytical and reporting outputs
 

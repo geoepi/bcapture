@@ -1,5 +1,12 @@
 # Local Initial Epi corpus diagnostics
 
+> Historical phase report: this document records the extraction-diagnostics
+> stage before the later semantic normalization and privacy-scoping audit. The
+> final package behavior and final validation state are documented in
+> [the semantic/de-identification audit](epi-semantic-deid-audit.md). This
+> report is retained as an audit trail and should not be read as the final
+> privacy outcome.
+
 Validation date: 2026-10-05. This report contains aggregate structural findings
 only. Source paths, filenames, extracted values, and re-identification mappings
 remain outside the repository.

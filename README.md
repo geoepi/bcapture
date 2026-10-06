@@ -135,11 +135,21 @@ For complete synthetic user workflows, see the
 - [Initial Epi visualization](docs/tutorials/initial-epi-visualization.md)
 - [Initial Epi HTML reporting](docs/tutorials/initial-epi-reporting.md)
 
-The extractor reads interactive PDF form fields directly when available. For
-the packaged, versioned Initial Epi and BCAP templates, it can also reconstruct
-selectable-text flattened PDFs using page geometry, baseline subtraction, and
-rendered control-mark comparison. OCR, handwriting recognition, and arbitrary
-unrecognized flattened layouts remain unsupported.
+The extractor reads interactive PDF form fields directly when available. The
+supported input classes are:
+
+- canonical interactive Initial Epi and BCAP AcroForm PDFs;
+- selectable-text flattened Initial Epi and BCAP PDFs that register against a
+  packaged, versioned template; and
+- a supported PDF container or Portfolio containing exactly one recognized
+  canonical Initial Epi AcroForm, recovered through guarded in-memory
+  extraction.
+
+The container route is not generic PDF Portfolio support: ambiguous containers,
+multiple candidate forms, nested containers, XFA, unknown attachments, and
+incompatible member signatures fail explicitly. Image-only scans, OCR-only
+inputs, handwritten forms, and arbitrary unrecognized flattened layouts are
+recognized as unsupported; OCR is outside the current extraction scope.
 
 ## Output structure
 
@@ -172,6 +182,9 @@ states, and multi-select flags. `collate_epi("epi_output")` applies the
 versioned 2024-05-28 semantic dictionary and writes analysis-ready scalar and
 repeated relational tables. Use `diagnose_epi("epi_output")` for Epi schema
 diagnostics. Other APHIS/HPAI PDF forms are not implied to be supported.
+Image-only scans and incompatible or unknown signatures are controlled
+unsupported outcomes that require OCR, template, or version review outside
+this package.
 
 ## Schema diagnostics
 
@@ -186,6 +199,12 @@ Diagnostic products appear under `bcapture_output/diagnostics/`. They separate
 logical-field presence, field-type, response-state, field-order, and widget
 encoding differences. PDF widget serialization can vary even when forms look
 identical, so no automatic semantic reconciliation is performed.
+
+For Epi batches, `extraction_manifest.csv` is also the route and failure audit:
+it records success or controlled failure, failure class, extraction method,
+template/schema identity, registration evidence where applicable, and PDF
+container/member provenance. A selected embedded member is processed in
+memory; the submitted container remains the source whose checksum is recorded.
 
 ## Flattened selectable-text PDFs
 
@@ -214,6 +233,10 @@ not stop the batch; it receives a `failed` manifest row with a useful failure
 type. Scanned, OCR-only, and unrecognized flattened forms are recorded with a
 classified failure such as `no_usable_digital_content`,
 `unrecognized_flattened_form`, or `registration_failed`.
+
+Extraction failures are distinct from semantic review findings. After a
+successful extraction and collation, `validate_epi()` may retain non-blocking
+warnings for source-data anomalies; it does not silently rewrite those values.
 
 ## Current limitations
 

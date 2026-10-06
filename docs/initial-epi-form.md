@@ -22,8 +22,17 @@ populated-only products.
 Interactive AcroForm PDFs are preferred. The versioned May 28, 2024 template
 also supports selectable-text flattened PDFs through a spatial fallback that
 uses page registration, blank-template subtraction, and rendered control-mark
-comparison. Scanned, OCR-only, handwritten, and unrecognized flattened forms
-remain unsupported and fail with an explicit classified failure.
+comparison. A supported PDF container or Portfolio is accepted only when it
+contains exactly one embedded Initial Epi AcroForm matching the registered
+canonical page count, schema, field count, and widget count; the selected form
+is recovered in memory and its container/member provenance is retained.
+This is guarded canonical-form recovery, not generic Portfolio support.
+
+Image-only scans without a usable text layer, OCR-only or handwritten forms,
+incompatible or unknown form signatures, ambiguous containers, nested
+containers, and arbitrary unrecognized flattened layouts remain unsupported
+and fail with an explicit classified failure. OCR and template/version review
+are outside the current extraction scope.
 
 Repeated fields retain their original logical names in raw extraction. The
 versioned dictionary and `collate_epi()` layer interprets them as house,
