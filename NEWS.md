@@ -1,5 +1,13 @@
 # bcapture 0.0.0.9000
 
+* Hardened Initial Epi collation for AcroForm representation variants while
+  preserving extracted and raw values: strict quoted multi-select arrays are
+  decoded into derived item rows, and well-formed comma-grouped numbers and
+  leading decimals are normalized before typed parsing. Malformed or unknown entries
+  remain available for validation review. Repeated-table validation also
+  ignores incomplete dictionary metadata when restoring public `raw_field`
+  provenance on findings.
+
 * Added conservative in-memory Initial Epi Portfolio/embedded-PDF extraction
   for a unique canonical interactive form, with submitted-container and selected
   member provenance. Ambiguous aggregates, duplicate logical fields, XFA,
