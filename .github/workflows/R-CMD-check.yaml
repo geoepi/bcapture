@@ -19,11 +19,11 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install Python dependencies
-        run: python -m pip install --upgrade pip pypdf pdfplumber pypdfium2
+        run: python -m pip install --upgrade pip numpy pypdf pdfplumber pypdfium2
       - name: Verify Python dependencies
         run: |
           python --version
-          python -c "from importlib.metadata import version; import pypdf, pdfplumber, pypdfium2; print('pypdf', version('pypdf')); print('pdfplumber', version('pdfplumber')); print('pypdfium2', version('pypdfium2'))"
+          python -c "from importlib.metadata import version; import numpy, pypdf, pdfplumber, pypdfium2; print('numpy', version('numpy')); print('pypdf', version('pypdf')); print('pdfplumber', version('pdfplumber')); print('pypdfium2', version('pypdfium2'))"
       - name: Configure reticulate Python
         shell: Rscript {0}
         run: |
