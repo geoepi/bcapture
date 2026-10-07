@@ -1,0 +1,153 @@
+---
+title: "BCAP workflow: extraction through analysis"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{BCAP workflow: extraction through analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, message=FALSE}
+library(bcapture)
+
+example_pdf <- system.file(
+  "extdata", "examples", "synthetic_bcap_audit_print.pdf",
+  package = "bcapture"
+)
+stopifnot(nzchar(example_pdf), file.exists(example_pdf))
+```
+
+This tutorial uses a fictional BCAP audit PDF included with the package. The
+values are synthetic and must not be replaced with completed production forms
+in a package installation or source repository.
+
+## Keep confidential, safe, crosswalk, and analysis data separate
+
+The BCAP workflow has four operational layers:
+
+1. **Confidential extraction output** retains source-form values and source
+   provenance for controlled processing.
+2. **Safe/de-identified output** contains only fields permitted by the
+   versioned BCAP privacy policy.
+3. **Private crosswalk** stores mappings needed for authorized
+   re-identification and must remain outside the safe output.
+4. **Analysis-ready output** contains the safe BCAP records, repeated-item
+   product, provenance, metadata, QA, and manifests.
+
+The safe output and the private crosswalk are separate by construction. Do not
+commit either production directory to a repository.
+
+## Extract and validate
+
+This opt-in example extracts the synthetic PDF into a temporary directory and
+then runs strict BCAP validation. PDF extraction requires the optional Python
+PDF dependencies, so the chunk is not evaluated during vignette builds.
+
+```{r bcap-extract-validate, eval=FALSE}
+input_dir <- tempfile("bcapture-bcap-input-")
+dir.create(input_dir, recursive = TRUE)
+file.copy(example_pdf, file.path(input_dir, "synthetic_bcap_audit.pdf"))
+
+extraction_dir <- tempfile("bcapture-bcap-extraction-")
+extraction_manifest <- extract_hpai(
+  in_dir = input_dir,
+  out_dir = extraction_dir,
+  diagnostics = TRUE,
+  quiet = TRUE
+)
+
+validation <- validate_hpai(
+  out_dir = extraction_dir,
+  write = TRUE,
+  strict = TRUE,
+  quiet = TRUE
+)
+validation$status
+```
+
+`validate_hpai()` is a semantic gate. It does not repair extracted values.
+Unsupported fields, invalid controls, and unparseable dates remain visible as
+findings and prevent strict finalization.
+
+## De-identify, privacy-audit, and collate
+
+`deidentify_hpai()` requires strict validation and writes the safe output and
+private crosswalk to distinct destinations. A second privacy audit can be run
+against the safe output before Phase 3 collation.
+
+```{r bcap-deidentify-collate, eval=FALSE}
+safe_dir <- tempfile("bcapture-bcap-safe-")
+private_crosswalk_dir <- tempfile("bcapture-bcap-crosswalk-")
+
+safe <- deidentify_hpai(
+  out_dir = extraction_dir,
+  deidentified_dir = safe_dir,
+  crosswalk_dir = private_crosswalk_dir,
+  strict = TRUE,
+  quiet = TRUE
+)
+
+privacy <- validate_hpai_privacy(
+  deidentified_dir = safe_dir,
+  crosswalk_dir = private_crosswalk_dir,
+  strict = TRUE,
+  write = TRUE,
+  quiet = TRUE
+)
+
+analysis_dir <- tempfile("bcapture-bcap-analysis-")
+analysis <- collate_bcap(
+  bcap_dir = safe_dir,
+  output_dir = analysis_dir,
+  bcap_crosswalk_dir = private_crosswalk_dir,
+  run_id = "tutorial-bcap",
+  quiet = TRUE
+)
+
+analysis$status
+list.files(analysis_dir)
+```
+
+The BCAP analysis family is independent of Initial Epi. Its core products are
+`records`, `repeated_items`, `provenance`, and `field_metadata`. The current
+BCAP template has no relational repeated structure, so `repeated_items` is an
+explicit empty typed table rather than an omitted product.
+
+## Inspect field metadata
+
+Use the versioned metadata dictionary to understand how source-form fields map
+to safe analysis output.
+
+```{r bcap-metadata}
+bcap_metadata <- field_metadata("bcap")
+bcap_metadata[
+  bcap_metadata$field_name %in% c("premises_address", "npin", "Q1_1_1"),
+  c("field_name", "canonical_name", "question_text", "section",
+    "question_number", "source_page", "response_type", "privacy_class",
+    "included_in_safe_output")
+]
+```
+
+Withheld fields remain in metadata even though they are absent from
+analysis-ready `records`. This preserves source-question traceability without
+exposing withheld values.
+
+## Fail closed and keep cross-reference optional
+
+Do not continue after a failed validation or privacy audit:
+
+```{r bcap-fail-closed, eval=FALSE}
+if (!identical(validation$status, "passed")) {
+  stop("BCAP validation failed; no safe output should be finalized.")
+}
+if (!identical(privacy$status, "passed")) {
+  stop("BCAP privacy audit failed; review findings before collation.")
+}
+```
+
+BCAP can be analyzed without Initial Epi. If both safe families and both
+private crosswalks are available, `cross_reference_hpai()` may be called as a
+separate optional step. It uses only exact authoritative premises keys; it
+does not infer links from dates, names, geography, or response similarity.
+Zero links is a valid outcome, and the Epi and BCAP output families remain
+separate.
