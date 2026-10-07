@@ -1,5 +1,10 @@
 # bcapture 0.0.0.9000
 
+* Normalized populated AcroForm `/Sig` values to the deterministic structural
+  marker `signature_present`, preserving empty/unsigned values and preventing
+  signature dictionary contents or verification metadata from entering public
+  extraction outputs. Non-signature field representations are unchanged.
+
 * Corrected known-source privacy matching for Initial Epi long-table responses
   by retaining logical raw-field context. Cross-field numeric collisions no
   longer flag unrelated retained quantities; same-field, global, nonnumeric,

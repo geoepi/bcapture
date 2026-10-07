@@ -27,6 +27,33 @@ def clean_field_value(value):
     return value[1:] if value.startswith("/") else value
 
 
+def _signature_value_marker(value):
+    """Return a stable marker without exposing signature dictionary contents."""
+    if value is None:
+        return None
+    value = _deref(value)
+    if value is None:
+        return None
+    if isinstance(value, (bytes, str)):
+        text = pdf_value_to_string(value)
+        return "" if text is None or text.strip() == "" else "signature_present"
+    return "signature_present"
+
+
+def normalized_field_value(value, field_type):
+    """Normalize values whose representation depends on the PDF field type."""
+    if clean_field_value(field_type) == "Sig":
+        return _signature_value_marker(value)
+    return clean_field_value(value)
+
+
+def field_value_to_string(value, field_type):
+    """Serialize a field value without stringifying a signature dictionary."""
+    if clean_field_value(field_type) == "Sig":
+        return _signature_value_marker(value)
+    return pdf_value_to_string(value)
+
+
 def states_to_string(states):
     if not states:
         return None
@@ -175,8 +202,8 @@ def extract_widgets(reader):
                 "rect_x2": rect_x2,
                 "rect_y2": rect_y2,
                 "appearance_state": clean_field_value(annotation.get("/AS")),
-                "value": clean_field_value(field_value),
-                "parent_value": clean_field_value(parent_value),
+                "value": normalized_field_value(field_value, field_type),
+                "parent_value": normalized_field_value(parent_value, field_type),
                 "states": states_to_string(states),
                 "options": options_to_string(_field_options(annotation)),
             })
@@ -258,9 +285,9 @@ def _extract_reader(reader):
         states = _field_states(field)
         raw_value = field.get("/V")
         raw_default = _inherited_value(field, "/DV")
-        normalized = clean_field_value(raw_value)
-        normalized_default = clean_field_value(raw_default)
         field_type = clean_field_value(_inherited_value(field, "/FT"))
+        normalized = normalized_field_value(raw_value, field_type)
+        normalized_default = normalized_field_value(raw_default, field_type)
         field_flags = _inherited_value(field, "/Ff")
         options = _field_options(field)
         is_button_off = normalized == "Off" and field_type in ("Btn", "button")
@@ -272,9 +299,9 @@ def _extract_reader(reader):
             "alternative_name": clean_field_value(field.get("/TU")),
             "field_type": field_type,
             "field_flags": int(field_flags) if field_flags is not None else None,
-            "value_raw": pdf_value_to_string(raw_value),
+            "value_raw": field_value_to_string(raw_value, field_type),
             "value": normalized,
-            "default_value_raw": pdf_value_to_string(raw_default),
+            "default_value_raw": field_value_to_string(raw_default, field_type),
             "default_value": normalized_default,
             "is_default_value": normalized is not None and normalized_default is not None and normalized == normalized_default,
             "states": states_to_string(states),
