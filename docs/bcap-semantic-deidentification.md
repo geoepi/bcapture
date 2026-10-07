@@ -32,6 +32,12 @@ The canonical 2025-12-08 BCAP template contains 225 fields:
 | CROSSWALK_ONLY | 0 | Reserved for future explicit policy |
 | REVIEW | 0 | Unknown field types fail closed rather than entering output |
 
+The 225-field count is the canonical BCAP privacy schema and therefore the
+complete policy surface. The current production corpus exercised 173 distinct
+fields, which is only an observed subset of that schema. The observed 173-field
+count must not replace the canonical 225-field count: unobserved canonical
+fields remain governed by the same fail-closed policy when they appear.
+
 The policy is conservative. It does not claim unrestricted public-release
 anonymization. Facility locations and arbitrary text are withheld because no
 BCAP-specific release policy or robust text scrubber is established. Direct
