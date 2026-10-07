@@ -151,6 +151,12 @@ incompatible member signatures fail explicitly. Image-only scans, OCR-only
 inputs, handwritten forms, and arbitrary unrecognized flattened layouts are
 recognized as unsupported; OCR is outside the current extraction scope.
 
+AcroForm `/Sig` fields are normalized deterministically: a populated signature
+field is represented by the structural marker `signature_present`, while an
+unsigned field retains the existing empty/`NA` representation. No signer,
+certificate, byte-range, contents, or signature-verification metadata is
+exposed by extraction.
+
 ## Output structure
 
 ```text
