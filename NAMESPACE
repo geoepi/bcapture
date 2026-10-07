@@ -2,6 +2,7 @@
 
 export(collate_epi)
 export(deidentify_epi)
+export(deidentify_hpai)
 export(derive_epi_features)
 export(diagnose_epi)
 export(diagnose_hpai)
@@ -19,3 +20,5 @@ export(render_epi_report)
 export(summarize_epi)
 export(summarize_epi_features)
 export(validate_epi)
+export(validate_hpai)
+export(validate_hpai_privacy)

@@ -240,18 +240,22 @@ type. Scanned, OCR-only, and unrecognized flattened forms are recorded with a
 classified failure such as `no_usable_digital_content`,
 `unrecognized_flattened_form`, or `registration_failed`.
 
-Extraction failures are distinct from semantic review findings. After a
-successful extraction and collation, `validate_epi()` may retain non-blocking
-warnings for source-data anomalies; it does not silently rewrite those values.
+Extraction failures are distinct from semantic review findings. For BCAP,
+`validate_hpai()` evaluates supported extracted records without inventing
+undocumented business rules. `deidentify_hpai()` and
+`validate_hpai_privacy()` form a conservative, strict privacy boundary:
+arbitrary text and facility locations are withheld, direct identifiers are
+crosswalk-backed pseudonyms, and safe output is finalized only with zero
+semantic and privacy errors or warnings. The four unsupported flattened forms
+remain outside the BCAP de-identification population.
 
 ## Current limitations
 
-OCR, handwriting recognition, audit scoring, dashboards, and inferential
-analysis are not implemented. Descriptive summaries are controlled-use
-products; the Initial Epi dictionary describes the questionnaire and its
-encodings, and no layer infers biological meaning or risk.
+OCR, handwriting recognition, audit scoring, dashboards, inferential analysis,
+BCAP semantic collation, and BCAP summaries are not implemented. BCAP
+validation is limited to documented extraction-schema checks; it does not
+infer biological meaning or undocumented audit rules.
 
 ## Development roadmap
 
-Future layers will add `collate_hpai()`, `validate_hpai()`,
-`summarize_hpai()`, and `view_hpai()`.
+Future layers may add BCAP semantic collation, summaries, and viewing.

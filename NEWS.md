@@ -1,5 +1,13 @@
 # bcapture 0.0.0.9000
 
+* Added the BCAP semantic-validation and privacy boundary: validate_hpai()
+  checks supported extraction outcomes, categorical domains, and dates;
+  deidentify_hpai() applies conservative field classifications, deterministic
+  pseudonyms, separate crosswalks, and fail-closed safe-output finalization;
+  validate_hpai_privacy() provides a field-aware strict privacy scan.
+  Unsupported flattened forms remain excluded, arbitrary BCAP text is withheld,
+  and structural signatures remain signature_present only.
+
 * Normalized populated AcroForm `/Sig` values to the deterministic structural
   marker `signature_present`, preserving empty/unsigned values and preventing
   signature dictionary contents or verification metadata from entering public
