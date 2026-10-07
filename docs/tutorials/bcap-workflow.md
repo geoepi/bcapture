@@ -124,15 +124,51 @@ bcap_batch_out/
 See the [output contract](../output-structure.md) for detailed file and column
 definitions.
 
-## Where the BCAP workflow currently ends
+## Validate and de-identify supported records
 
-The implemented BCAP workflow is:
+After extraction and structural diagnostics, the supported BCAP workflow is:
 
 ~~~
 extract_hpai()
 diagnose_hpai()
+validate_hpai()
+deidentify_hpai()
+validate_hpai_privacy()
 ~~~
 
-Do not call `collate_hpai()`, `validate_hpai()`, or `deidentify_hpai()`; those
-functions do not currently exist. For the complete Initial Epi workflow,
-continue to the [Initial Epi workflow tutorial](initial-epi-workflow.md).
+validate_hpai() applies only checks supported by the extracted schema:
+controlled extraction failures, categorical domains, date parsing, and field
+type coverage. It does not infer undocumented business rules.
+
+deidentify_hpai() accepts an extracted output directory, not raw PDFs. Use
+separate operational paths for confidential extraction, safe output, and the
+private crosswalk. A short-path layout is recommended on Windows:
+
+~~~r
+validation <- validate_hpai("D:/secure/bcap/a_conf")
+
+safe <- deidentify_hpai(
+  out_dir = "D:/secure/bcap/a_conf",
+  deidentified_dir = "D:/secure/bcap/a_safe",
+  crosswalk_dir = "D:/secure/bcap/a_xwalk"
+)
+
+validate_hpai_privacy(
+  deidentified_dir = "D:/secure/bcap/a_safe",
+  crosswalk_dir = "D:/secure/bcap/a_xwalk"
+)
+~~~
+
+The policy classifies canonical BCAP fields as SAFE_RETAIN, SAFE_NORMALIZE,
+PSEUDONYMIZE, or WITHHOLD. The current canonical template has 160 retained, 3
+normalized, 15 pseudonymized, and 47 withheld fields; no canonical field is
+silently assigned REVIEW. Arbitrary text is withheld rather than redacted
+speculatively. `/Sig` fields remain the structural signature_present marker
+only.
+
+Safe output is fail-closed. Any blocking semantic issue, privacy error,
+privacy warning, unresolved policy field, crosswalk conflict, or unsafe path
+prevents finalization. The four 17-page unrecognized_flattened_form records
+remain controlled extraction failures and are not passed to de-identification.
+For the complete Initial Epi workflow, continue to the [Initial Epi workflow
+tutorial](initial-epi-workflow.md).
