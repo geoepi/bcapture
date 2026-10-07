@@ -1,0 +1,151 @@
+---
+title: "Initial Epi workflow: extraction through analysis"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Initial Epi workflow: extraction through analysis}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, message=FALSE}
+library(bcapture)
+
+example_pdf <- system.file(
+  "extdata", "examples", "synthetic_initial_epi_print.pdf",
+  package = "bcapture"
+)
+stopifnot(nzchar(example_pdf), file.exists(example_pdf))
+```
+
+This tutorial uses the fictional PDF shipped with the package. It contains no
+production records or real identifiers. Replace the temporary input and output
+directories below with controlled locations when adapting the workflow to an
+approved dataset.
+
+## Keep the four data layers separate
+
+The supported workflow has four distinct layers:
+
+1. **Confidential extraction output** contains source-form values and source
+   provenance. Treat it as restricted working data.
+2. **Safe/de-identified output** contains pseudonyms or normalized values after
+   semantic validation and privacy checks pass.
+3. **Private crosswalk** contains re-identification and source-linkage mappings.
+   It is created outside the safe output and must never be distributed with it.
+4. **Analysis-ready output** contains the separate Epi family products used by
+   downstream analysis. It does not contain the private crosswalk.
+
+The analysis-ready Phase 3 API is intentionally separate from the existing
+`collate_epi()` API. `collate_epi()` converts raw extraction products into
+semantic relational products; `collate_epi_analysis()` consumes the validated
+safe output and writes the final Epi analysis family.
+
+## Extract, collate, and validate
+
+The following opt-in example copies the synthetic PDF into a temporary input
+directory, extracts it, performs the established semantic collation, and runs
+validation. Extraction of PDFs requires the optional Python PDF dependencies;
+the code is therefore shown but not evaluated while the vignette is built.
+
+```{r epi-extract-validate, eval=FALSE}
+input_dir <- tempfile("bcapture-epi-input-")
+dir.create(input_dir, recursive = TRUE)
+file.copy(example_pdf, file.path(input_dir, "synthetic_initial_epi.pdf"))
+
+extraction_dir <- tempfile("bcapture-epi-extraction-")
+extraction_manifest <- extract_epi(
+  in_dir = input_dir,
+  out_dir = extraction_dir,
+  diagnostics = TRUE,
+  quiet = TRUE
+)
+
+# Convert extraction rows into the semantic Epi products required by validation.
+collated <- collate_epi(
+  out_dir = extraction_dir,
+  quiet = TRUE
+)
+
+validation <- validate_epi(
+  out_dir = extraction_dir,
+  write = TRUE,
+  strict = FALSE,
+  quiet = TRUE
+)
+validation
+```
+
+Validation reports findings; it does not repair or reinterpret source values.
+For a production run, review the findings and continue only when the intended
+privacy and semantic gates are satisfied.
+
+## De-identify and finalize the Epi analysis family
+
+`deidentify_epi()` writes a safe output tree and a physically separate private
+crosswalk. The Phase 3 finalizer then consumes only the safe tree.
+
+```{r epi-deidentify-collate, eval=FALSE}
+safe_dir <- tempfile("bcapture-epi-safe-")
+private_crosswalk_dir <- tempfile("bcapture-epi-crosswalk-")
+
+safe <- deidentify_epi(
+  out_dir = extraction_dir,
+  deidentified_dir = safe_dir,
+  crosswalk_dir = private_crosswalk_dir,
+  strict = TRUE,
+  quiet = TRUE
+)
+
+analysis_dir <- tempfile("bcapture-epi-analysis-")
+analysis <- collate_epi_analysis(
+  epi_dir = safe_dir,
+  output_dir = analysis_dir,
+  epi_crosswalk_dir = private_crosswalk_dir,
+  run_id = "tutorial-epi",
+  quiet = TRUE
+)
+
+analysis$status
+list.files(analysis_dir)
+```
+
+The resulting Epi family contains `records`, `repeated_items`, `provenance`,
+and `field_metadata`, together with QA and manifest products. Repeated Epi
+tables remain long rather than being flattened into the parent record table.
+
+## Inspect field metadata
+
+Field metadata is generated from the version-controlled dictionary and privacy
+policy, not from production values.
+
+```{r epi-metadata}
+epi_metadata <- field_metadata("epi")
+epi_metadata[
+  epi_metadata$field_name %in% c("premises_address", "premises_id"),
+  c("field_name", "canonical_name", "question_text", "section",
+    "question_number", "source_page", "response_type", "privacy_class",
+    "included_in_safe_output")
+]
+```
+
+Metadata includes fields that are intentionally withheld from safe output.
+This lets analysts understand the source-form question and its privacy
+disposition without receiving the withheld value.
+
+## Fail-closed behavior and optional linkage
+
+If validation or privacy checks fail, `deidentify_epi()` stops before a safe
+output is finalized. For example, a production caller should treat the
+following as a blocking condition rather than bypassing it:
+
+```{r epi-fail-closed, eval=FALSE}
+if (!identical(validation$status, "passed")) {
+  stop("Review validation findings before de-identification.")
+}
+```
+
+Cross-form linkage is not required for Epi analysis. When both safe families
+are available, `cross_reference_hpai()` is an optional, fail-closed utility
+that uses only exact authoritative premises keys from both private crosswalks.
+It never infers a relationship from dates, names, geography, or similarity;
+zero authoritative links is valid.
