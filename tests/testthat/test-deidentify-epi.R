@@ -221,6 +221,22 @@ test_that("crosswalk reuse is stable and extension does not renumber", {
   expect_equal(second$status, "passed")
 })
 
+test_that("same premises key shares one pseudonym within a batch", {
+  source_dir <- .deid_synthetic_output(
+    list(synthetic_1 = .deid_values(), synthetic_2 = .deid_values(owner = "Second Owner")),
+    schemas = c("schema_a", "schema_a")
+  )
+  deid_dir <- tempfile("epi-deid-shared-premises-output-")
+  crosswalk_dir <- tempfile("epi-deid-shared-premises-crosswalk-")
+  result <- bcapture::deidentify_epi(source_dir, deid_dir, crosswalk_dir, quiet = TRUE)
+  expect_identical(result$status, "passed")
+  forms <- readr::read_csv(file.path(deid_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)
+  expect_equal(forms$premises_id[[1L]], forms$premises_id[[2L]])
+  record_crosswalk <- readr::read_csv(file.path(crosswalk_dir, "record_crosswalk.csv"), show_col_types = FALSE)
+  expect_equal(length(unique(record_crosswalk$premises_pseudonym)), 1L)
+  expect_equal(length(unique(record_crosswalk$premises_key)), 1L)
+})
+
 test_that("path safety rejects nested and version-controlled crosswalks", {
   source_dir <- tempfile("epi-deid-path-source-"); dir.create(source_dir, recursive = TRUE)
   deid_dir <- tempfile("epi-deid-path-output-")

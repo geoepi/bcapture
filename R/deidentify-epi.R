@@ -187,6 +187,10 @@
   if (nrow(premise_rows) > 0L && any(vapply(split(premise_rows$premises_key, premise_rows$premises_pseudonym), function(keys) length(unique(keys)) > 1L, logical(1)))) {
     stop("Existing record crosswalk contains contradictory premises mappings.", call. = FALSE)
   }
+  keyed_rows <- premise_rows[!is.na(premise_rows$premises_key) & nzchar(premise_rows$premises_key), , drop = FALSE]
+  if (nrow(keyed_rows) > 0L && any(vapply(split(keyed_rows$premises_pseudonym, keyed_rows$premises_key), function(pseudonyms) length(unique(pseudonyms)) > 1L, logical(1)))) {
+    stop("Existing record crosswalk contains ambiguous premises mappings.", call. = FALSE)
+  }
   if (any(!grepl("^CASE-[0-9]+$", x$case_id)) || any(!is.na(x$premises_pseudonym) & !grepl("^PREMISES-[0-9]+$", x$premises_pseudonym))) {
     stop("Existing record crosswalk contains invalid pseudonym formats.", call. = FALSE)
   }
@@ -349,8 +353,9 @@
     name_key <- .epi_deid_normalize(original_name[[i]])
     county_key <- .epi_deid_normalize(county[[i]])
     premises_keys[[i]] <- if (!is.na(id_key)) paste0("id:", id_key) else if (!is.na(name_key) && !is.na(county_key)) paste0("name_county:", name_key, "|", county_key) else paste0("case:", ids[[i]])
+    current <- if (i == 1L) NA_integer_ else match(premises_keys[[i]], premises_keys[seq_len(i - 1L)])
     hit <- match(source_key[[i]], old_keys)
-    if (!is.na(hit) && !is.na(old_premises[[hit]]) && nzchar(old_premises[[hit]])) premises_ids[[i]] <- old_premises[[hit]] else {
+    if (!is.na(current)) premises_ids[[i]] <- premises_ids[[current]] else if (!is.na(hit) && !is.na(old_premises[[hit]]) && nzchar(old_premises[[hit]])) premises_ids[[i]] <- old_premises[[hit]] else {
       prior <- match(premises_keys[[i]], as.character(old$premises_key))
       if (!is.na(prior)) premises_ids[[i]] <- old$premises_pseudonym[[prior]] else {
         next_premises <- next_premises + 1L
