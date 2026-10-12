@@ -240,9 +240,10 @@ type. Scanned, OCR-only, and unrecognized flattened forms are recorded with a
 classified failure such as `no_usable_digital_content`,
 `unrecognized_flattened_form`, or `registration_failed`.
 
-Extraction failures are distinct from semantic review findings. For BCAP,
-`validate_hpai()` evaluates supported extracted records without inventing
-undocumented business rules. `deidentify_hpai()` and
+Extraction failures are distinct from semantic review findings and are
+record-level outcomes. For BCAP, `validate_hpai()` evaluates successful
+extracted records without inventing undocumented business rules, while failed
+rows remain classified in extraction/QA provenance. `deidentify_hpai()` and
 `validate_hpai_privacy()` form a conservative, strict privacy boundary:
 arbitrary text and facility locations are withheld, direct identifiers are
 crosswalk-backed pseudonyms, and safe output is finalized only with zero

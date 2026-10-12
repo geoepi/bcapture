@@ -35,6 +35,22 @@ hpai_test_products <- function(root, invalid_date = FALSE) {
   invisible(root)
 }
 
+hpai_mixed_test_products <- function(root) {
+  hpai_test_products(root)
+  manifest_path <- file.path(root, "extraction_manifest.csv")
+  manifest <- readr::read_csv(manifest_path, show_col_types = FALSE)
+  failed <- manifest[rep(1L, 2L), , drop = FALSE]
+  failed$audit_id <- c("failed_scan", "failed_layout")
+  failed$source_file <- paste0(failed$audit_id, ".pdf")
+  failed$source_relpath <- failed$source_file
+  failed$source_md5 <- paste0("md5-", failed$audit_id)
+  failed$status <- "failed"
+  failed$failure_type <- c("no_usable_digital_content", "unexpected_form_type")
+  failed$error <- c("No usable digital content.", "Unexpected form type.")
+  readr::write_csv(dplyr::bind_rows(manifest, failed), manifest_path, na = "")
+  invisible(root)
+}
+
 test_that("BCAP policy is complete for the canonical template", {
   policy <- bcapture:::.hpai_schema_inventory(bcapture:::.hpai_template_fields())
   expect_equal(nrow(policy), 225L)
@@ -76,6 +92,49 @@ test_that("BCAP semantic validation and strict finalization pass synthetic recor
   expect_identical(
     safe_fields$value[safe_fields$field == "npin"],
     safe_reuse_fields$value[safe_reuse_fields$field == "npin"]
+  )
+})
+
+test_that("BCAP mixed extraction manifests validate and de-identify only successes", {
+  root <- tempfile("bcap-hpai-mixed-")
+  hpai_mixed_test_products(root)
+  validation <- bcapture::validate_hpai(root, write = TRUE, quiet = TRUE)
+  expect_identical(validation$status, "passed")
+  expect_equal(validation$summary$records_evaluated, 1L)
+
+  safe <- tempfile("bcap-safe-mixed-")
+  crosswalk <- tempfile("bcap-crosswalk-mixed-")
+  result <- bcapture::deidentify_hpai(root, safe, crosswalk, quiet = TRUE)
+  expect_identical(result$status, "passed")
+  safe_fields <- readr::read_csv(file.path(safe, "combined", "hpai_fields_long.csv"), show_col_types = FALSE)
+  expect_equal(length(unique(safe_fields$record_id)), 1L)
+  expect_false(any(c("failed_scan", "failed_layout") %in% safe_fields$record_id))
+  provenance <- readr::read_csv(file.path(safe, "privacy", "extraction_provenance.csv"), show_col_types = FALSE)
+  expect_equal(provenance$total_forms_attempted, 3L)
+  expect_equal(provenance$successful_extractions, 1L)
+  expect_equal(provenance$failed_extractions, 2L)
+  expect_match(provenance$failure_types, "no_usable_digital_content=1")
+  expect_match(provenance$failure_types, "unexpected_form_type=1")
+})
+
+test_that("BCAP all-failed extraction batches fail before semantic processing", {
+  root <- tempfile("bcap-hpai-all-failed-")
+  hpai_mixed_test_products(root)
+  fields_path <- file.path(root, "combined", "hpai_fields_long.csv")
+  fields <- readr::read_csv(fields_path, show_col_types = FALSE)
+  readr::write_csv(fields[0, , drop = FALSE], fields_path, na = "")
+  manifest_path <- file.path(root, "extraction_manifest.csv")
+  manifest <- readr::read_csv(manifest_path, show_col_types = FALSE)
+  manifest$status <- "failed"
+  manifest$failure_type <- c("no_usable_digital_content", "no_usable_digital_content", "unexpected_form_type")
+  readr::write_csv(manifest, manifest_path, na = "")
+
+  validation <- bcapture::validate_hpai(root, write = FALSE, quiet = TRUE)
+  expect_identical(validation$status, "failed")
+  expect_true(any(grepl("No successful BCAP audit records", validation$findings$message, fixed = TRUE)))
+  expect_error(
+    bcapture::deidentify_hpai(root, tempfile("bcap-safe-all-failed-"), tempfile("bcap-crosswalk-all-failed-"), quiet = TRUE),
+    "semantic validation"
   )
 })
 

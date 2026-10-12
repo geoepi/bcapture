@@ -1,4 +1,4 @@
-.deid_synthetic_output <- function(values = list(), schemas = c("schema_a")) {
+.deid_synthetic_output <- function(values = list(), schemas = c("schema_a"), failed_manifest = NULL) {
   dictionary <- bcapture:::load_epi_dictionary()
   out_dir <- tempfile("epi-deid-source-")
   dir.create(file.path(out_dir, "combined"), recursive = TRUE)
@@ -35,8 +35,9 @@
     form_schema_hash = schema, schema_group = schema, extraction_method = "synthetic",
     pypdf_version = NA_character_, extracted_at_utc = "2024-05-28T00:00:00Z"
   ))
+  if (!is.null(failed_manifest)) manifest <- dplyr::bind_rows(manifest, failed_manifest)
   readr::write_csv(field_rows, file.path(out_dir, "combined", "epi_fields_long.csv"), na = "")
-  readr::write_csv(dplyr::select(manifest, form_id, form_type, source_file, source_relpath, source_sha256, form_schema_hash, schema_group), file.path(out_dir, "combined", "epi_metadata.csv"), na = "")
+  readr::write_csv(dplyr::filter(manifest, status == "success") |> dplyr::select(form_id, form_type, source_file, source_relpath, source_sha256, form_schema_hash, schema_group), file.path(out_dir, "combined", "epi_metadata.csv"), na = "")
   readr::write_csv(manifest, file.path(out_dir, "extraction_manifest.csv"), na = "")
   bcapture::collate_epi(out_dir, quiet = TRUE)
   out_dir
@@ -176,6 +177,25 @@ test_that("deidentify_epi protects direct identifiers and preserves analytical t
   expect_true(file.exists(file.path(crosswalk_dir, "entity_crosswalk.csv")))
   expect_false(dir.exists(file.path(deid_dir, "crosswalk")))
   expect_equal(source_forms, readr::read_csv(file.path(source_dir, "collated", "epi_forms.csv"), show_col_types = FALSE))
+})
+
+test_that("Initial Epi de-identification excludes failed source forms", {
+  failed <- tibble::tribble(
+    ~form_id, ~form_type, ~source_file, ~source_relpath, ~source_sha256, ~status, ~failure_type,
+    "failed_scan", "initial_epi", "failed_scan.pdf", "failed_scan.pdf", "sha-failed_scan", "failed", "no_usable_digital_content"
+  )
+  source_dir <- .deid_synthetic_output(list(synthetic_1 = .deid_values()), failed_manifest = failed)
+  deid_dir <- tempfile("epi-deid-mixed-output-")
+  crosswalk_dir <- tempfile("epi-deid-mixed-crosswalk-")
+  result <- bcapture::deidentify_epi(source_dir, deid_dir, crosswalk_dir, quiet = TRUE)
+  expect_identical(result$status, "passed")
+  forms <- readr::read_csv(file.path(deid_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)
+  expect_equal(nrow(forms), 1L)
+  expect_false("failed_scan" %in% forms$case_id)
+  provenance <- readr::read_csv(file.path(deid_dir, "privacy", "extraction_provenance.csv"), show_col_types = FALSE)
+  expect_equal(provenance$total_forms_attempted, 2L)
+  expect_equal(provenance$successful_extractions, 1L)
+  expect_equal(provenance$failed_extractions, 1L)
 })
 
 test_that("crosswalk reuse is stable and extension does not renumber", {

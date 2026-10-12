@@ -773,6 +773,19 @@ deidentify_epi <- function(out_dir, deidentified_dir, crosswalk_dir, version = "
   crosswalk <- .epi_deid_load_crosswalks(paths$crosswalk_dir)
   forms <- .epi_deid_read_csv(fs::path(collated, "epi_forms.csv"), "epi_forms.csv")
   if (!"form_id" %in% names(forms)) stop("Collated scalar product is missing `form_id`.", call. = FALSE)
+  extraction_manifest_path <- fs::path(paths$out_dir, "extraction_manifest.csv")
+  extraction_summary <- NULL
+  if (file.exists(extraction_manifest_path)) {
+    manifest_result <- .epi_validate_extraction_manifest(.epi_deid_read_csv(extraction_manifest_path, "extraction_manifest.csv"))
+    successful_ids <- as.character(manifest_result$successes$form_id)
+    form_ids <- as.character(forms$form_id)
+    if (length(setdiff(form_ids, successful_ids)) > 0L) {
+      stop("Initial Epi collation contains a form that was not an extraction success.", call. = FALSE)
+    }
+    extraction_summary <- .epi_extraction_batch_summary(manifest_result$manifest, extraction_manifest_path, nrow(forms), NA_integer_, NA_integer_)
+  } else if (file.exists(fs::path(collated, "collation_batch_summary.csv"))) {
+    extraction_summary <- .epi_deid_read_csv(fs::path(collated, "collation_batch_summary.csv"), "collation_batch_summary.csv")
+  }
   state <- new.env(parent = emptyenv()); state$strict <- isTRUE(strict); state$events <- list(); state$sensitive_values <- character(); state$sensitive_context <- list(); state$entities <- crosswalk$entity; state$entity_keys <- character()
   case_map <- .epi_deid_case_map(forms, crosswalk, state)
   records <- case_map$records
@@ -810,6 +823,10 @@ deidentify_epi <- function(out_dir, deidentified_dir, crosswalk_dir, version = "
   }
   manifest <- tibble::tibble(form_version = version, profile = profile, policy_version = version, policy_hash = digest::digest(rules, algo = "sha256", serialize = TRUE), package_version = "0.0.0.9000", forms_processed = nrow(records), cases_pseudonymized = length(unique(records$case_id)), premises_pseudonymized = length(unique(records$premises_pseudonym)), persons_pseudonymized = sum(state$entities$entity_type == "PERSON"), organizations_pseudonymized = sum(state$entities$entity_type == "ORG"), entities_pseudonymized = sum(state$entities$entity_type == "ENTITY"), contacts_pseudonymized = sum(state$entities$entity_type == "CONTACT"), locations_pseudonymized = sum(state$entities$entity_type == "LOCATION"), direct_identifier_fields_removed = sum(audit$privacy_class == "direct_identifier" & audit$n_values_removed > 0L), free_text_fields_withheld = sum(audit$privacy_class == "sensitive_free_text" & audit$n_review_removed > 0L), privacy_warnings = warnings, privacy_errors = confirmed, validation_available = validation_available, status = if (warnings > 0L) "review" else "passed", created_at = utc_now())
   privacy_dir <- fs::path(temp_dir, "privacy"); dir.create(privacy_dir, recursive = TRUE, showWarnings = FALSE)
+  if (!is.null(extraction_summary)) {
+    extraction_summary$forms_deidentified <- as.integer(nrow(records))
+    write_csv_utf8(extraction_summary, fs::path(privacy_dir, "extraction_provenance.csv"))
+  }
   readr::write_csv(rules, fs::path(privacy_dir, "policy_snapshot.csv"), na = "")
   readr::write_csv(audit, fs::path(privacy_dir, "deidentification_audit.csv"), na = "")
   readr::write_csv(review, fs::path(privacy_dir, "deidentification_review.csv"), na = "")

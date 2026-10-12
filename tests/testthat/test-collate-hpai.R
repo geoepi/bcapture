@@ -93,6 +93,39 @@ test_that("BCAP analysis collation is independent and excludes withheld values",
   expect_equal(result$qa$metrics$value[result$qa$metrics$metric == "metadata_main_columns_missing"], 0L)
 })
 
+test_that("Phase 3 collation preserves mixed-batch source counts without adding failures", {
+  root <- tempfile("phase3-mixed-source-")
+  dir.create(root)
+  epi_dir <- phase3_make_epi_safe(file.path(root, "epi"), c("CASE-000001"), c("PREMISES-000001"))
+  bcap_dir <- phase3_make_bcap_safe(file.path(root, "bcap"), c("BCAP-CASE-000001"), c("PREMISES-000001"))
+  epi_manifest <- data.frame(
+    form_id = c("epi-success", "epi-failed"), status = c("success", "failed"),
+    failure_type = c(NA, "no_usable_digital_content"), stringsAsFactors = FALSE
+  )
+  bcap_manifest <- data.frame(
+    audit_id = c("bcap-success", "bcap-failed"), status = c("success", "failed"),
+    failure_type = c(NA, "unexpected_form_type"), stringsAsFactors = FALSE
+  )
+  epi_manifest_path <- file.path(root, "epi-extraction-manifest.csv")
+  bcap_manifest_path <- file.path(root, "bcap-extraction-manifest.csv")
+  phase3_write_csv(epi_manifest, epi_manifest_path)
+  phase3_write_csv(bcap_manifest, bcap_manifest_path)
+  epi_result <- collate_epi_analysis(epi_dir, file.path(root, "epi-analysis"), epi_source_manifest = epi_manifest_path, run_id = "mixed", quiet = TRUE)
+  bcap_result <- collate_bcap(bcap_dir, file.path(root, "bcap-analysis"), bcap_source_manifest = bcap_manifest_path, run_id = "mixed", quiet = TRUE)
+
+  expect_equal(nrow(epi_result$tables$records), 1L)
+  expect_equal(nrow(epi_result$tables$repeated_items), 0L)
+  expect_equal(nrow(bcap_result$tables$records), 1L)
+  expect_equal(nrow(bcap_result$tables$repeated_items), 0L)
+  expect_equal(epi_result$qa$source_counts$discovered, 2L)
+  expect_equal(epi_result$qa$source_counts$unsupported, 1L)
+  expect_identical(epi_result$qa$source_counts$failure_types, "no_usable_digital_content=1")
+  expect_equal(bcap_result$qa$source_counts$discovered, 2L)
+  expect_equal(bcap_result$qa$source_counts$unsupported, 1L)
+  expect_identical(bcap_result$qa$source_counts$failure_types, "unexpected_form_type=1")
+  expect_false(any(c("epi-failed", "bcap-failed") %in% c(epi_result$tables$records$record_id, bcap_result$tables$records$record_id)))
+})
+
 test_that("wrapper keeps Epi and BCAP outputs separate and permits zero links", {
   root <- tempfile("phase3-wrapper-")
   dir.create(root)

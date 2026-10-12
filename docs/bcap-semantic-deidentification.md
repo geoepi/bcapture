@@ -13,11 +13,13 @@ PDFs
 ~~~
 
 validate_hpai() evaluates the extraction manifest and long field table. It
-allows only the known unrecognized_flattened_form outcome as an excluded
-record class. It checks categorical responses against extracted button/choice
-domains, normalizes the documented BCAP date fields, and rejects unknown field
-types or incomplete successful extraction products. It does not infer
-undocumented business rules, table semantics, or cross-field contradictions.
+validates successful extracted records while retaining every classified
+failure row as extraction provenance. A mixed batch proceeds when at least one
+record succeeds; an all-failed batch stops clearly. It checks categorical
+responses against extracted button/choice domains, normalizes the documented
+BCAP date fields, and rejects unknown field types or incomplete successful
+extraction products. It does not infer undocumented business rules, table
+semantics, or cross-field contradictions.
 
 ## Privacy classification
 

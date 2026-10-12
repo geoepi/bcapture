@@ -21,6 +21,13 @@ function. It identifies potential data-quality and logical-consistency issues;
 it does not repair or reinterpret respondent or interviewer entries, infer
 missing information, calculate risk, or provide a completeness score.
 
+Validation is record-level: failed extraction rows remain in the extraction
+manifest and validation provenance, but only the successful subset is
+semantically validated. A batch with no successful extraction fails with a
+clear diagnostic; extraction failure in one PDF is not a semantic finding for
+another PDF. Genuine schema, semantic, and integrity errors in successful
+records remain blocking under the existing strict gate.
+
 The layers have distinct meanings:
 
 * **Extraction failure:** the PDF could not be read structurally.

@@ -383,10 +383,13 @@ validate_epi_codes <- function(products, dictionary, rules) {
 
 #' Validate collated Initial Epi semantic products
 #'
-#' `validate_epi()` reads successful extraction and collation products, reports
-#' potential data-quality findings, and never repairs or reinterprets entries.
+#' `validate_epi()` reads the successful subset of a record-level extraction
+#' manifest and collation products, reports potential data-quality findings,
+#' and never repairs or reinterprets entries. Failed extraction rows remain
+#' represented in the validation provenance products but are not validated as
+#' semantic records.
 #'
-#' @param out_dir Existing successful `extract_epi()`/`collate_epi()` output directory.
+#' @param out_dir Existing `extract_epi()`/`collate_epi()` output directory.
 #' @param version Versioned Initial Epi dictionary, currently `"2024-05-28"`.
 #' @param write Write validation products below `out_dir/validation`.
 #' @param strict Return complete findings but signal a warning when an ERROR exists.
@@ -396,6 +399,12 @@ validate_epi_codes <- function(products, dictionary, rules) {
 validate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict = FALSE, quiet = FALSE) {
   out_dir <- validate_scalar_path(out_dir, "out_dir")
   if (!dir.exists(out_dir)) stop("`out_dir` does not exist or is not a directory.", call. = FALSE)
+  extraction_manifest_path <- fs::path(out_dir, "extraction_manifest.csv")
+  if (!file.exists(extraction_manifest_path)) stop("Successful extraction manifest is missing; validate_epi() does not rerun extraction.", call. = FALSE)
+  manifest_result <- .epi_validate_extraction_manifest(.epi_validation_read(extraction_manifest_path))
+  extraction_manifest <- manifest_result$manifest
+  successful_ids <- as.character(manifest_result$successes$form_id)
+  if (length(successful_ids) == 0L) stop("validate_epi() found no successfully extracted Initial Epi forms to validate.", call. = FALSE)
   collated_dir <- fs::path(out_dir, "collated")
   if (!dir.exists(collated_dir)) stop("`out_dir` does not contain a collated/ directory; run extract_epi() and collate_epi() first.", call. = FALSE)
   dictionary <- load_epi_dictionary(version)
@@ -404,10 +413,6 @@ validate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict =
   required <- c(fs::path(collated_dir, c("epi_forms.csv", "epi_responses_long.csv", "epi_multiselect_responses.csv", "collation_manifest.csv", "collation_parse_diagnostics.csv")), table_files)
   missing <- required[!file.exists(required)]
   if (length(missing) > 0L) stop("Successful collation products are missing: ", paste(fs::path_file(missing), collapse = ", "), call. = FALSE)
-  extraction_manifest_path <- fs::path(out_dir, "extraction_manifest.csv")
-  if (!file.exists(extraction_manifest_path)) stop("Successful extraction manifest is missing; validate_epi() does not rerun extraction.", call. = FALSE)
-  extraction_manifest <- .epi_validation_read(extraction_manifest_path)
-  if (nrow(extraction_manifest) == 0L || any(extraction_manifest$status != "success", na.rm = TRUE)) stop("validate_epi() requires a successful extract_epi() manifest.", call. = FALSE)
   collation_manifest <- .epi_validation_read(fs::path(collated_dir, "collation_manifest.csv"))
   if (nrow(collation_manifest) == 0L || any(!collation_manifest$status %in% c("success", "warning"), na.rm = TRUE)) stop("validate_epi() requires successful collate_epi() products.", call. = FALSE)
   products <- list(
@@ -417,6 +422,20 @@ validate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict =
     parse_diagnostics = .epi_validation_read(fs::path(collated_dir, "collation_parse_diagnostics.csv")),
     tables = stats::setNames(lapply(table_files, .epi_validation_read), names(.epi_table_output_names))
   )
+  form_ids <- unique(as.character(products$forms$form_id))
+  if (length(setdiff(form_ids, successful_ids)) > 0L || length(setdiff(successful_ids, form_ids)) > 0L) {
+    stop("Initial Epi semantic products do not exactly cover the successful extraction subset.", call. = FALSE)
+  }
+  semantic_products <- c(list(products$forms, products$responses, products$multiselect), products$tables)
+  semantic_ids <- unique(unlist(lapply(semantic_products, function(x) {
+    if ("form_id" %in% names(x)) as.character(x$form_id) else character()
+  }), use.names = FALSE))
+  if (length(setdiff(semantic_ids, successful_ids)) > 0L) {
+    stop("Initial Epi semantic products contain a failed or unknown extraction form.", call. = FALSE)
+  }
+  if (!"form_id" %in% names(collation_manifest) || length(setdiff(successful_ids, as.character(collation_manifest$form_id))) > 0L) {
+    stop("Initial Epi collation manifest does not cover every successful extraction.", call. = FALSE)
+  }
   results <- dplyr::bind_rows(
     validate_epi_parse(products, dictionary), validate_epi_ranges(products, dictionary),
     validate_epi_dates(products, dictionary), validate_epi_conditionals(products, dictionary, rules),
@@ -425,17 +444,20 @@ validate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict =
   if (nrow(results) == 0L) results <- new_validation_results()
   summary <- .epi_validation_summary(results)
   form_summary <- .epi_validation_form_summary(results, products$forms)
+  extraction_summary <- .epi_extraction_batch_summary(extraction_manifest, extraction_manifest_path, nrow(products$forms), nrow(products$forms))
   if (isTRUE(write)) {
     validation_dir <- fs::path(out_dir, "validation")
     dir.create(validation_dir, recursive = TRUE, showWarnings = FALSE)
     write_csv_utf8(results, fs::path(validation_dir, "validation_results.csv"))
     write_csv_utf8(summary, fs::path(validation_dir, "validation_summary.csv"))
     write_csv_utf8(form_summary, fs::path(validation_dir, "validation_form_summary.csv"))
+    write_csv_utf8(extraction_summary, fs::path(validation_dir, "extraction_provenance.csv"))
     writeLines(.epi_validation_report(results, summary, form_summary, version), fs::path(validation_dir, "validation_report.md"), useBytes = TRUE)
   }
   strict_failure <- isTRUE(strict) && any(results$severity == "ERROR")
   attr(results, "validation_summary") <- summary
   attr(results, "validation_form_summary") <- form_summary
+  attr(results, "extraction_summary") <- extraction_summary
   attr(results, "strict_failure") <- strict_failure
   if (strict_failure) warning("Strict Initial Epi validation found one or more ERROR findings; complete results were returned and written.", call. = FALSE)
   if (!isTRUE(quiet)) cli::cli_inform("Validated {nrow(products$forms)} Initial Epi form{?s}; {nrow(results)} finding{?s} recorded.")

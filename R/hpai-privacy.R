@@ -12,7 +12,6 @@ utils::globalVariables(c(
   "CROSSWALK_ONLY", "REVIEW"
 )
 
-.hpai_allowed_failure_types <- "unrecognized_flattened_form"
 .hpai_date_fields <- c("initial_audit_date", "audit_pass_date", "Producer_date")
 .hpai_location_fields <- c(
   "premises_address", "prem_city", "prem_county", "prem_state", "prem_zip", "prem_gps"
@@ -181,6 +180,46 @@ utils::globalVariables(c(
   )
 }
 
+.hpai_validate_extraction_manifest <- function(manifest) {
+  required <- c("audit_id", "form_type", "status", "failure_type")
+  missing <- setdiff(required, names(manifest))
+  if (length(missing) > 0L) stop("BCAP extraction manifest is missing required columns: ", paste(missing, collapse = ", "), call. = FALSE)
+  if (nrow(manifest) == 0L) stop("BCAP extraction manifest is empty.", call. = FALSE)
+  audit_ids <- as.character(manifest$audit_id)
+  if (any(is.na(audit_ids) | !nzchar(audit_ids)) || anyDuplicated(audit_ids)) stop("BCAP extraction manifest must contain unique, non-empty audit IDs.", call. = FALSE)
+  if (any(is.na(manifest$form_type) | as.character(manifest$form_type) != "bcap")) stop("extraction_manifest.csv is not a BCAP extraction.", call. = FALSE)
+  status <- tolower(trimws(as.character(manifest$status)))
+  if (any(is.na(status) | !status %in% c("success", "failed"))) stop("BCAP extraction manifest contains an unsupported extraction status.", call. = FALSE)
+  failed <- status == "failed"
+  failure_type <- as.character(manifest$failure_type)
+  if (any(failed & (is.na(failure_type) | !nzchar(trimws(failure_type))))) stop("Every failed BCAP extraction must retain a failure_type.", call. = FALSE)
+  manifest$status <- status
+  list(
+    manifest = manifest,
+    successes = manifest[status == "success", , drop = FALSE],
+    failures = manifest[status == "failed", , drop = FALSE]
+  )
+}
+
+.hpai_extraction_batch_summary <- function(manifest, manifest_path, deidentified = NA_integer_) {
+  status <- tolower(as.character(manifest$status))
+  failures <- manifest[status != "success", , drop = FALSE]
+  failure_types <- if (nrow(failures) == 0L) NA_character_ else {
+    counts <- sort(table(as.character(failures$failure_type)))
+    paste(paste(names(counts), as.integer(counts), sep = "="), collapse = "|")
+  }
+  tibble::tibble(
+    form_family = "bcap",
+    total_forms_attempted = as.integer(nrow(manifest)),
+    successful_extractions = as.integer(sum(status == "success")),
+    failed_extractions = as.integer(sum(status != "success")),
+    records_deidentified = as.integer(deidentified),
+    failure_types = failure_types,
+    extraction_manifest_sha256 = source_sha256(manifest_path),
+    status = "passed"
+  )
+}
+
 .hpai_empty_findings <- function() {
   tibble::tibble(
     record_key = character(), severity = character(), issue_type = character(),
@@ -241,11 +280,19 @@ validate_hpai <- function(out_dir, write = TRUE, strict = TRUE, quiet = FALSE) {
       field_type = as.character(field_type), message = as.character(message)
     ))
   }
-  required_manifest <- c("audit_id", "status", "failure_type")
+  required_manifest <- c("audit_id", "form_type", "status", "failure_type")
   missing_manifest <- setdiff(required_manifest, names(products$manifest))
   if (length(missing_manifest) > 0L) {
     add_finding(severity = "ERROR", issue_type = "missing_required",
       message = paste0("Extraction manifest is missing required columns: ", paste(missing_manifest, collapse = ", ")))
+  } else {
+    manifest_result <- tryCatch(.hpai_validate_extraction_manifest(products$manifest), error = function(error) {
+      add_finding(severity = "ERROR", issue_type = "missing_required", message = conditionMessage(error))
+      NULL
+    })
+    if (!is.null(manifest_result) && nrow(manifest_result$successes) == 0L) {
+      add_finding(severity = "ERROR", issue_type = "missing_required", message = "No successful BCAP audit records are available to process.")
+    }
   }
   required_fields <- c("audit_id", "field", "field_type", "value", "value_raw", "states", "options")
   missing_fields <- setdiff(required_fields, names(products$fields))
@@ -254,20 +301,16 @@ validate_hpai <- function(out_dir, write = TRUE, strict = TRUE, quiet = FALSE) {
       message = paste0("Field table is missing required columns: ", paste(missing_fields, collapse = ", ")))
   }
   if (nrow(findings) == 0L) {
-    successes <- products$manifest[products$manifest$status == "success", , drop = FALSE]
-    failures <- products$manifest[products$manifest$status != "success" | is.na(products$manifest$status), , drop = FALSE]
-    if (nrow(successes) == 0L) {
-      add_finding(severity = "ERROR", issue_type = "missing_required", message = "No successful BCAP audit records are available.")
-    }
-    if (nrow(failures) > 0L) {
-      unknown <- failures[is.na(failures$failure_type) | !failures$failure_type %in% .hpai_allowed_failure_types, , drop = FALSE]
-      if (nrow(unknown) > 0L) add_finding(
-        record_key = paste(unknown$audit_id, collapse = ","), severity = "ERROR",
-        issue_type = "unsupported_semantics", message = "An extraction failure outside the supported BCAP exclusion list was encountered."
-      )
-    }
+    products$manifest <- manifest_result$manifest
+    successes <- manifest_result$successes
+    failures <- manifest_result$failures
     successful_ids <- as.character(successes$audit_id)
     fields <- products$fields[products$fields$audit_id %in% successful_ids, , drop = FALSE]
+    orphan_fields <- setdiff(unique(as.character(products$fields$audit_id)), successful_ids)
+    if (length(orphan_fields) > 0L) add_finding(
+      record_key = paste(orphan_fields, collapse = ","), severity = "ERROR", issue_type = "missing_required",
+      message = "BCAP field products contain an audit that did not extract successfully."
+    )
     inventory <- .hpai_schema_inventory(fields)
     policy <- inventory[inventory$observed_in_extraction, , drop = FALSE]
     for (field_name in unique(fields$field)) {
@@ -571,6 +614,8 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
   validation <- validate_hpai(paths$out_dir, write = FALSE, strict = TRUE, quiet = TRUE)
   if (!identical(validation$status, "passed")) stop("BCAP semantic validation did not pass; no safe output was finalized.", call. = FALSE)
   products <- .hpai_read_extraction(paths$out_dir)
+  manifest_result <- .hpai_validate_extraction_manifest(products$manifest)
+  extraction_summary <- .hpai_extraction_batch_summary(manifest_result$manifest, fs::path(paths$out_dir, "extraction_manifest.csv"), NA_integer_)
   crosswalk <- .hpai_load_crosswalk(paths$crosswalk_dir)
   state <- new.env(parent = emptyenv())
   state$entities <- crosswalk$entity
@@ -648,6 +693,8 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
     dplyr::mutate(n_input_nonmissing = dplyr::coalesce(n_input_nonmissing, 0L), n_output_nonmissing = n_output_rows)
   write_csv_utf8(audit, fs::path(temp_safe, "privacy", "deidentification_audit.csv"))
   write_csv_utf8(privacy_audit, fs::path(temp_safe, "privacy", "privacy_leak_audit.csv"))
+  extraction_summary$records_deidentified <- as.integer(nrow(records))
+  write_csv_utf8(extraction_summary, fs::path(temp_safe, "privacy", "extraction_provenance.csv"))
   manifest <- tibble::tibble(
     form_family = "bcap", records_processed = nrow(records), fields_retained = sum(policy$privacy_class == "SAFE_RETAIN"),
     fields_normalized = sum(policy$privacy_class == "SAFE_NORMALIZE"), fields_pseudonymized = sum(policy$privacy_class == "PSEUDONYMIZE"),
