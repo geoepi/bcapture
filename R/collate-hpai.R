@@ -271,7 +271,7 @@ utils::globalVariables(c("entity_id", "entity_scope", "metric", "product"))
 }
 
 .phase3_bcap_safe_entity <- function(fields, record_ids) {
-  candidate_fields <- c("npin", "premisesfarm_name", "prem_special_id")
+  candidate_fields <- c("npin", "NPIN", "premisesfarm_name", "prem_special_id")
   candidates <- fields[fields$field %in% candidate_fields & .phase3_nonmissing(fields$value), c("record_id", "value"), drop = FALSE]
   result <- stats::setNames(rep(NA_character_, length(record_ids)), record_ids)
   for (record_id in record_ids) {

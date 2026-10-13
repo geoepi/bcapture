@@ -65,6 +65,8 @@ test_that("fields outside the versioned template are withheld", {
   expect_identical(bcapture:::.hpai_field_policy("Hist2", "Btn")$privacy_class, "WITHHOLD")
   expect_identical(bcapture:::.hpai_field_policy("Q_2_5source1a", "Ch")$privacy_class, "WITHHOLD")
   expect_identical(bcapture:::.hpai_field_policy("Q1_3_17e", "Btn")$privacy_class, "SAFE_RETAIN")
+  expect_identical(bcapture:::.hpai_field_policy("NPIN", "Tx")$privacy_class, "PSEUDONYMIZE")
+  expect_true("NPIN" %in% field_metadata("bcap")$field_name)
 })
 
 test_that("BCAP semantic validation and strict finalization pass synthetic records", {

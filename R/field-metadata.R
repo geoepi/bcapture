@@ -125,13 +125,14 @@
 .phase3_bcap_supplemental_fields <- function() {
   tibble::tibble(
     field = c(
+      "NPIN",
       "Q1_1_remediation", "Q1_2_remediation", "Q1_3_remediation", "Q1_3_17e",
       "Q1_4_remediation", "Q1_5_remediation", "Q1_6_remediation", "Q1_7_remediation",
       "Q2_1_remediation", "Q2_2_remediation", "Q2_3_remediation", "Q3_1_remediation",
       "Q3_2_remediation", "Q3_3_remediation", "Q3_4_remediation", "Q3_5_remediation"
     ),
-    field_type = c("Tx", "Tx", "Tx", "Btn", rep("Tx", 12L)),
-    alternative_name = NA_character_, page = NA_integer_, x1 = NA_real_, y1 = NA_real_, x2 = NA_real_, y2 = NA_real_,
+    field_type = c("Tx", "Tx", "Tx", "Tx", "Btn", rep("Tx", 12L)),
+    alternative_name = c("Premises identifier (source alias)", rep(NA_character_, 16L)), page = NA_integer_, x1 = NA_real_, y1 = NA_real_, x2 = NA_real_, y2 = NA_real_,
     states = NA_character_, options = NA_character_, stringsAsFactors = FALSE
   )
 }

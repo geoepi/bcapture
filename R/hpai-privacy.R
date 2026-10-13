@@ -16,7 +16,7 @@ utils::globalVariables(c(
 .hpai_location_fields <- c(
   "premises_address", "prem_city", "prem_county", "prem_state", "prem_zip", "prem_gps"
 )
-.hpai_premises_fields <- c("npin", "premisesfarm_name", "prem_special_id")
+.hpai_premises_fields <- c("npin", "NPIN", "premisesfarm_name", "prem_special_id")
 .hpai_technical_fields <- c("FileNameField", "FileNameGen", "SaveAs")
 
 .hpai_template_fields <- function() {
