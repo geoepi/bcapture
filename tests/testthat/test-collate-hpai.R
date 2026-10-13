@@ -93,6 +93,21 @@ test_that("BCAP analysis collation is independent and excludes withheld values",
   expect_equal(result$qa$metrics$value[result$qa$metrics$metric == "metadata_main_columns_missing"], 0L)
 })
 
+test_that("Phase 3 permits retained crosswalk history outside the current safe batch", {
+  root <- tempfile("phase3-crosswalk-history-")
+  dir.create(root)
+  bcap_dir <- phase3_make_bcap_safe(file.path(root, "bcap"), c("BCAP-CASE-000001"), c("PREMISES-000001"))
+  crosswalk_dir <- phase3_make_crosswalk(file.path(root, "bcap-xwalk"), "bcap", "BCAP-CASE-000001", "history-key", "PREMISES-000001")
+  crosswalk <- readr::read_csv(file.path(crosswalk_dir, "record_crosswalk.csv"), show_col_types = FALSE)
+  phase3_write_csv(dplyr::bind_rows(crosswalk, tibble::tibble(
+    source_key = "historical-source", record_id = "BCAP-CASE-000002", source_file = "historical.pdf",
+    source_md5 = "historical-md5", premises_key = "historical-key", premises_pseudonym = "PREMISES-000002"
+  )), file.path(crosswalk_dir, "record_crosswalk.csv"))
+  result <- collate_bcap(bcap_dir, file.path(root, "analysis"), bcap_crosswalk_dir = crosswalk_dir, run_id = "history", quiet = TRUE)
+  expect_identical(result$status, "passed")
+  expect_equal(nrow(result$tables$records), 1L)
+})
+
 test_that("Phase 3 collation preserves mixed-batch source counts without adding failures", {
   root <- tempfile("phase3-mixed-source-")
   dir.create(root)
