@@ -48,6 +48,17 @@ utils::globalVariables(c(
   field <- as.character(field)[[1L]]
   field_type <- as.character(field_type)[[1L]]
   alternative_name <- as.character(alternative_name)[[1L]]
+  known_fields <- as.character(.hpai_template_fields()$field)
+  if (exists(".phase3_bcap_supplemental_fields", mode = "function")) {
+    known_fields <- c(known_fields, as.character(.phase3_bcap_supplemental_fields()$field))
+  }
+  if (identical(field_type, "Btn") && !field %in% known_fields) {
+    return(list(
+      privacy_class = "WITHHOLD", identifier_class = "unknown_schema_field",
+      pseudonym_class = NA_character_, free_text = FALSE, linkage_required = FALSE,
+      notes = "Observed button field is outside the versioned BCAP template; withheld pending semantic mapping."
+    ))
+  }
   if (field %in% .hpai_technical_fields) {
     return(list(
       privacy_class = "WITHHOLD", identifier_class = "technical_metadata",
