@@ -61,8 +61,9 @@ test_that("BCAP policy is complete for the canonical template", {
   expect_equal(sum(policy$privacy_class == "WITHHOLD"), 47L)
 })
 
-test_that("button fields outside the versioned template are withheld", {
+test_that("fields outside the versioned template are withheld", {
   expect_identical(bcapture:::.hpai_field_policy("Hist2", "Btn")$privacy_class, "WITHHOLD")
+  expect_identical(bcapture:::.hpai_field_policy("Q_2_5source1a", "Ch")$privacy_class, "WITHHOLD")
   expect_identical(bcapture:::.hpai_field_policy("Q1_3_17e", "Btn")$privacy_class, "SAFE_RETAIN")
 })
 
