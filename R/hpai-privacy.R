@@ -12,12 +12,12 @@ utils::globalVariables(c(
   "CROSSWALK_ONLY", "REVIEW"
 )
 
-.hpai_allowed_failure_types <- "unrecognized_flattened_form"
 .hpai_date_fields <- c("initial_audit_date", "audit_pass_date", "Producer_date")
-.hpai_location_fields <- c(
-  "premises_address", "prem_city", "prem_county", "prem_state", "prem_zip", "prem_gps"
+.hpai_withheld_location_fields <- c(
+  "premises_address", "prem_city", "prem_zip", "prem_gps"
 )
-.hpai_premises_fields <- c("npin", "premisesfarm_name", "prem_special_id")
+.hpai_retained_geography_fields <- c("prem_county", "prem_state")
+.hpai_premises_fields <- c("npin", "NPIN", "premisesfarm_name", "prem_special_id")
 .hpai_technical_fields <- c("FileNameField", "FileNameGen", "SaveAs")
 
 .hpai_template_fields <- function() {
@@ -49,6 +49,17 @@ utils::globalVariables(c(
   field <- as.character(field)[[1L]]
   field_type <- as.character(field_type)[[1L]]
   alternative_name <- as.character(alternative_name)[[1L]]
+  known_fields <- as.character(.hpai_template_fields()$field)
+  if (exists(".phase3_bcap_supplemental_fields", mode = "function")) {
+    known_fields <- c(known_fields, as.character(.phase3_bcap_supplemental_fields()$field))
+  }
+  if (!field %in% known_fields) {
+    return(list(
+      privacy_class = "WITHHOLD", identifier_class = "unknown_schema_field",
+      pseudonym_class = NA_character_, free_text = FALSE, linkage_required = FALSE,
+      notes = "Observed field is outside the versioned BCAP template; withheld pending semantic mapping."
+    ))
+  }
   if (field %in% .hpai_technical_fields) {
     return(list(
       privacy_class = "WITHHOLD", identifier_class = "technical_metadata",
@@ -70,11 +81,18 @@ utils::globalVariables(c(
       notes = "Date is retained only after deterministic ISO-date normalization."
     ))
   }
-  if (field %in% .hpai_location_fields) {
+  if (field %in% .hpai_retained_geography_fields) {
+    return(list(
+      privacy_class = "SAFE_RETAIN", identifier_class = "quasi_identifier",
+      pseudonym_class = NA_character_, free_text = FALSE, linkage_required = FALSE,
+      notes = "Coarse administrative geography is intentionally retained exactly as entered; no normalization, validation, geocoding, or crosswalk is applied."
+    ))
+  }
+  if (field %in% .hpai_withheld_location_fields) {
     return(list(
       privacy_class = "WITHHOLD", identifier_class = "location",
       pseudonym_class = NA_character_, free_text = FALSE, linkage_required = FALSE,
-      notes = "Facility location is withheld because BCAP-specific release policy is not established."
+      notes = "Precise facility geography is withheld, including address, city, ZIP, and GPS coordinates."
     ))
   }
   if (field %in% .hpai_premises_fields) {
@@ -181,6 +199,46 @@ utils::globalVariables(c(
   )
 }
 
+.hpai_validate_extraction_manifest <- function(manifest) {
+  required <- c("audit_id", "form_type", "status", "failure_type")
+  missing <- setdiff(required, names(manifest))
+  if (length(missing) > 0L) stop("BCAP extraction manifest is missing required columns: ", paste(missing, collapse = ", "), call. = FALSE)
+  if (nrow(manifest) == 0L) stop("BCAP extraction manifest is empty.", call. = FALSE)
+  audit_ids <- as.character(manifest$audit_id)
+  if (any(is.na(audit_ids) | !nzchar(audit_ids)) || anyDuplicated(audit_ids)) stop("BCAP extraction manifest must contain unique, non-empty audit IDs.", call. = FALSE)
+  if (any(is.na(manifest$form_type) | as.character(manifest$form_type) != "bcap")) stop("extraction_manifest.csv is not a BCAP extraction.", call. = FALSE)
+  status <- tolower(trimws(as.character(manifest$status)))
+  if (any(is.na(status) | !status %in% c("success", "failed"))) stop("BCAP extraction manifest contains an unsupported extraction status.", call. = FALSE)
+  failed <- status == "failed"
+  failure_type <- as.character(manifest$failure_type)
+  if (any(failed & (is.na(failure_type) | !nzchar(trimws(failure_type))))) stop("Every failed BCAP extraction must retain a failure_type.", call. = FALSE)
+  manifest$status <- status
+  list(
+    manifest = manifest,
+    successes = manifest[status == "success", , drop = FALSE],
+    failures = manifest[status == "failed", , drop = FALSE]
+  )
+}
+
+.hpai_extraction_batch_summary <- function(manifest, manifest_path, deidentified = NA_integer_) {
+  status <- tolower(as.character(manifest$status))
+  failures <- manifest[status != "success", , drop = FALSE]
+  failure_types <- if (nrow(failures) == 0L) NA_character_ else {
+    counts <- sort(table(as.character(failures$failure_type)))
+    paste(paste(names(counts), as.integer(counts), sep = "="), collapse = "|")
+  }
+  tibble::tibble(
+    form_family = "bcap",
+    total_forms_attempted = as.integer(nrow(manifest)),
+    successful_extractions = as.integer(sum(status == "success")),
+    failed_extractions = as.integer(sum(status != "success")),
+    records_deidentified = as.integer(deidentified),
+    failure_types = failure_types,
+    extraction_manifest_sha256 = source_sha256(manifest_path),
+    status = "passed"
+  )
+}
+
 .hpai_empty_findings <- function() {
   tibble::tibble(
     record_key = character(), severity = character(), issue_type = character(),
@@ -216,6 +274,12 @@ utils::globalVariables(c(
 
 .hpai_nonmissing <- function(value) !is.na(value) & nzchar(trimws(as.character(value)))
 
+.hpai_canonical_field <- function(field) {
+  field <- as.character(field)
+  field[field == "NPIN"] <- "npin"
+  field
+}
+
 #' Validate extracted BCAP audit products
 #'
 #' validate_hpai applies only schema-supported checks. It permits the known
@@ -241,11 +305,19 @@ validate_hpai <- function(out_dir, write = TRUE, strict = TRUE, quiet = FALSE) {
       field_type = as.character(field_type), message = as.character(message)
     ))
   }
-  required_manifest <- c("audit_id", "status", "failure_type")
+  required_manifest <- c("audit_id", "form_type", "status", "failure_type")
   missing_manifest <- setdiff(required_manifest, names(products$manifest))
   if (length(missing_manifest) > 0L) {
     add_finding(severity = "ERROR", issue_type = "missing_required",
       message = paste0("Extraction manifest is missing required columns: ", paste(missing_manifest, collapse = ", ")))
+  } else {
+    manifest_result <- tryCatch(.hpai_validate_extraction_manifest(products$manifest), error = function(error) {
+      add_finding(severity = "ERROR", issue_type = "missing_required", message = conditionMessage(error))
+      NULL
+    })
+    if (!is.null(manifest_result) && nrow(manifest_result$successes) == 0L) {
+      add_finding(severity = "ERROR", issue_type = "missing_required", message = "No successful BCAP audit records are available to process.")
+    }
   }
   required_fields <- c("audit_id", "field", "field_type", "value", "value_raw", "states", "options")
   missing_fields <- setdiff(required_fields, names(products$fields))
@@ -254,20 +326,16 @@ validate_hpai <- function(out_dir, write = TRUE, strict = TRUE, quiet = FALSE) {
       message = paste0("Field table is missing required columns: ", paste(missing_fields, collapse = ", ")))
   }
   if (nrow(findings) == 0L) {
-    successes <- products$manifest[products$manifest$status == "success", , drop = FALSE]
-    failures <- products$manifest[products$manifest$status != "success" | is.na(products$manifest$status), , drop = FALSE]
-    if (nrow(successes) == 0L) {
-      add_finding(severity = "ERROR", issue_type = "missing_required", message = "No successful BCAP audit records are available.")
-    }
-    if (nrow(failures) > 0L) {
-      unknown <- failures[is.na(failures$failure_type) | !failures$failure_type %in% .hpai_allowed_failure_types, , drop = FALSE]
-      if (nrow(unknown) > 0L) add_finding(
-        record_key = paste(unknown$audit_id, collapse = ","), severity = "ERROR",
-        issue_type = "unsupported_semantics", message = "An extraction failure outside the supported BCAP exclusion list was encountered."
-      )
-    }
+    products$manifest <- manifest_result$manifest
+    successes <- manifest_result$successes
+    failures <- manifest_result$failures
     successful_ids <- as.character(successes$audit_id)
     fields <- products$fields[products$fields$audit_id %in% successful_ids, , drop = FALSE]
+    orphan_fields <- setdiff(unique(as.character(products$fields$audit_id)), successful_ids)
+    if (length(orphan_fields) > 0L) add_finding(
+      record_key = paste(orphan_fields, collapse = ","), severity = "ERROR", issue_type = "missing_required",
+      message = "BCAP field products contain an audit that did not extract successfully."
+    )
     inventory <- .hpai_schema_inventory(fields)
     policy <- inventory[inventory$observed_in_extraction, , drop = FALSE]
     for (field_name in unique(fields$field)) {
@@ -571,6 +639,8 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
   validation <- validate_hpai(paths$out_dir, write = FALSE, strict = TRUE, quiet = TRUE)
   if (!identical(validation$status, "passed")) stop("BCAP semantic validation did not pass; no safe output was finalized.", call. = FALSE)
   products <- .hpai_read_extraction(paths$out_dir)
+  manifest_result <- .hpai_validate_extraction_manifest(products$manifest)
+  extraction_summary <- .hpai_extraction_batch_summary(manifest_result$manifest, fs::path(paths$out_dir, "extraction_manifest.csv"), NA_integer_)
   crosswalk <- .hpai_load_crosswalk(paths$crosswalk_dir)
   state <- new.env(parent = emptyenv())
   state$entities <- crosswalk$entity
@@ -591,7 +661,13 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
     if (is.na(raw)) {
       output_values[[i]] <- NA_character_
     } else if (identical(action, "SAFE_RETAIN")) {
-      output_values[[i]] <- if (identical(as.character(row$field_type[[1L]]), "Sig")) "signature_present" else trimws(raw)
+      output_values[[i]] <- if (identical(as.character(row$field_type[[1L]]), "Sig")) {
+        "signature_present"
+      } else if (as.character(row$field[[1L]]) %in% .hpai_retained_geography_fields) {
+        raw
+      } else {
+        trimws(raw)
+      }
     } else if (identical(action, "SAFE_NORMALIZE")) {
       output_values[[i]] <- .hpai_date(raw)
     } else if (identical(action, "PSEUDONYMIZE")) {
@@ -606,7 +682,7 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
   safe_fields <- fields |>
     dplyr::transmute(
       record_id = records$record_id[match(audit_id, records$source_key)],
-      field_index = as.integer(field_index), page = as.integer(page), field = as.character(field),
+      field_index = as.integer(field_index), page = as.integer(page), field = .hpai_canonical_field(field),
       field_type = as.character(field_type), states = as.character(states), options = as.character(options),
       is_populated = !is.na(output_values) & nzchar(output_values), value = output_values,
       privacy_class = as.character(privacy_class), privacy_action = as.character(privacy_action),
@@ -644,10 +720,12 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
   write_csv_utf8(policy, fs::path(temp_safe, "privacy", "policy_snapshot.csv"))
   audit <- safe_fields |>
     dplyr::count(field, privacy_class, privacy_action, identifier_class, name = "n_output_rows") |>
-    dplyr::left_join(fields |> dplyr::filter(.hpai_nonmissing(value)) |> dplyr::count(field, name = "n_input_nonmissing"), by = "field") |>
+    dplyr::left_join(fields |> dplyr::filter(.hpai_nonmissing(value)) |> dplyr::mutate(field = .hpai_canonical_field(field)) |> dplyr::count(field, name = "n_input_nonmissing"), by = "field") |>
     dplyr::mutate(n_input_nonmissing = dplyr::coalesce(n_input_nonmissing, 0L), n_output_nonmissing = n_output_rows)
   write_csv_utf8(audit, fs::path(temp_safe, "privacy", "deidentification_audit.csv"))
   write_csv_utf8(privacy_audit, fs::path(temp_safe, "privacy", "privacy_leak_audit.csv"))
+  extraction_summary$records_deidentified <- as.integer(nrow(records))
+  write_csv_utf8(extraction_summary, fs::path(temp_safe, "privacy", "extraction_provenance.csv"))
   manifest <- tibble::tibble(
     form_family = "bcap", records_processed = nrow(records), fields_retained = sum(policy$privacy_class == "SAFE_RETAIN"),
     fields_normalized = sum(policy$privacy_class == "SAFE_NORMALIZE"), fields_pseudonymized = sum(policy$privacy_class == "PSEUDONYMIZE"),

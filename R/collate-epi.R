@@ -1,3 +1,5 @@
+utils::globalVariables("failure_type")
+
 .epi_table_output_names <- c(
   ai_tests = "epi_ai_tests", houses = "epi_houses", mortality_disposal = "epi_mortality_disposal",
   manure_destinations = "epi_manure_destinations", imported_materials = "epi_imported_materials",
@@ -436,9 +438,78 @@ validate_epi_table_types <- function(table_name, table, dictionary) {
   ))
 }
 
+.epi_extraction_manifest_required <- c("form_id", "form_type", "status", "failure_type")
+
+.epi_validate_extraction_manifest <- function(manifest) {
+  missing <- setdiff(.epi_extraction_manifest_required, names(manifest))
+  if (length(missing) > 0L) {
+    stop("Initial Epi extraction manifest is missing required columns: ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (nrow(manifest) == 0L) stop("Initial Epi extraction manifest is empty.", call. = FALSE)
+  form_ids <- as.character(manifest$form_id)
+  if (any(is.na(form_ids) | !nzchar(form_ids)) || anyDuplicated(form_ids)) {
+    stop("Initial Epi extraction manifest must contain unique, non-empty form IDs.", call. = FALSE)
+  }
+  if (any(is.na(manifest$form_type) | as.character(manifest$form_type) != "initial_epi")) {
+    stop("extraction_manifest.csv is not an Initial Epi extraction.", call. = FALSE)
+  }
+  status <- tolower(trimws(as.character(manifest$status)))
+  if (any(is.na(status) | !status %in% c("success", "failed"))) {
+    stop("Initial Epi extraction manifest contains an unsupported extraction status.", call. = FALSE)
+  }
+  failed <- status == "failed"
+  failure_type <- as.character(manifest$failure_type)
+  if (any(failed & (is.na(failure_type) | !nzchar(trimws(failure_type))))) {
+    stop("Every failed Initial Epi extraction must retain a failure_type.", call. = FALSE)
+  }
+  manifest$status <- status
+  list(
+    manifest = manifest,
+    successes = manifest[status == "success", , drop = FALSE],
+    failures = manifest[status == "failed", , drop = FALSE]
+  )
+}
+
+.epi_extraction_batch_summary <- function(manifest, manifest_path, collated = NA_integer_, validated = NA_integer_, deidentified = NA_integer_) {
+  status <- tolower(as.character(manifest$status))
+  failures <- manifest[status != "success", , drop = FALSE]
+  failure_types <- if (nrow(failures) == 0L) NA_character_ else {
+    counts <- sort(table(as.character(failures$failure_type)))
+    paste(paste(names(counts), as.integer(counts), sep = "="), collapse = "|")
+  }
+  tibble::tibble(
+    form_family = "initial_epi",
+    total_forms_attempted = as.integer(nrow(manifest)),
+    successful_extractions = as.integer(sum(status == "success")),
+    failed_extractions = as.integer(sum(status != "success")),
+    forms_collated = as.integer(collated),
+    forms_validated = as.integer(validated),
+    forms_deidentified = as.integer(deidentified),
+    failure_types = failure_types,
+    extraction_manifest_sha256 = source_sha256(manifest_path),
+    status = "passed"
+  )
+}
+
+.epi_collation_provenance <- function(manifest, manifest_path, successful_ids) {
+  manifest_hash <- source_sha256(manifest_path)
+  status <- tolower(as.character(manifest$status))
+  details <- manifest |>
+    dplyr::transmute(
+      form_family = "initial_epi", form_id = as.character(form_id),
+      extraction_status = status, collation_status = ifelse(status == "success", "collated", "excluded_extraction_failure"),
+      failure_type = as.character(failure_type), extraction_method = as.character(extraction_method),
+      source_file = as.character(source_file), source_relpath = as.character(source_relpath),
+      source_sha256 = as.character(source_sha256), extraction_manifest_sha256 = manifest_hash
+    )
+  summary <- .epi_extraction_batch_summary(manifest, manifest_path, length(successful_ids))
+  list(details = details, summary = summary)
+}
+
 #' Collate raw Initial Epi extraction products into semantic relational data
 #'
-#' @param out_dir Existing successful `extract_epi()` output directory.
+#' @param out_dir Existing `extract_epi()` output directory. A mixed manifest
+#'   is allowed when at least one form extracted successfully.
 #' @param version Dictionary version, currently `"2024-05-28"`.
 #' @param write Write products below `out_dir/collated`.
 #' @param strict Stop on populated unmapped fields or invalid semantic mappings.
@@ -455,16 +526,29 @@ collate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict = 
   dictionary <- load_epi_dictionary(version)
   fields <- readr::read_csv(paths$fields_long, show_col_types = FALSE)
   metadata <- readr::read_csv(paths$metadata, show_col_types = FALSE)
-  extraction_manifest <- readr::read_csv(paths$manifest, show_col_types = FALSE)
-  if (!"status" %in% names(extraction_manifest) || any(extraction_manifest$status != "success", na.rm = TRUE)) {
-    stop("collate_epi() requires a successful Epi extraction; extraction_manifest.csv contains failed form(s).", call. = FALSE)
+  manifest_result <- .epi_validate_extraction_manifest(readr::read_csv(paths$manifest, show_col_types = FALSE))
+  extraction_manifest <- manifest_result$manifest
+  successful_manifest <- manifest_result$successes
+  if (nrow(successful_manifest) == 0L) stop("collate_epi() found no successfully extracted Initial Epi forms to process.", call. = FALSE)
+  successful_ids <- as.character(successful_manifest$form_id)
+  if (!"form_id" %in% names(fields) || !"form_id" %in% names(metadata)) {
+    stop("Initial Epi extraction products are missing `form_id`.", call. = FALSE)
   }
-  if (nrow(extraction_manifest) == 0L || any(extraction_manifest$form_type != "initial_epi", na.rm = TRUE)) stop("extraction_manifest.csv is not an Initial Epi extraction.", call. = FALSE)
+  field_ids <- unique(as.character(fields$form_id))
+  metadata_ids <- unique(as.character(metadata$form_id))
+  if (length(setdiff(field_ids, successful_ids)) > 0L || length(setdiff(metadata_ids, successful_ids)) > 0L) {
+    stop("Initial Epi extraction products contain records that are not extraction successes.", call. = FALSE)
+  }
+  if (length(setdiff(successful_ids, field_ids)) > 0L || length(setdiff(successful_ids, metadata_ids)) > 0L) {
+    stop("A successful Initial Epi extraction is missing field or metadata products.", call. = FALSE)
+  }
+  fields <- fields[as.character(fields$form_id) %in% successful_ids, , drop = FALSE]
+  metadata <- metadata[as.character(metadata$form_id) %in% successful_ids, , drop = FALSE]
   mapped <- .epi_join_dictionary(fields, dictionary)
   unknown_populated <- unique(mapped$raw_field[!mapped$mapped %in% TRUE & mapped$populated %in% TRUE])
   if (isTRUE(strict) && length(unknown_populated) > 0L) stop("Unmapped populated Epi field(s): ", paste(unknown_populated, collapse = ", "), call. = FALSE)
-  forms_ids <- unique(as.character(extraction_manifest$form_id))
-  provenance <- extraction_manifest |>
+  forms_ids <- successful_ids
+  provenance <- successful_manifest |>
     dplyr::transmute(
       form_id = as.character(form_id), form_version = "2024-05-28", dictionary_version = "1",
       dictionary_hash = dictionary$dictionary_hash, source_file = as.character(source_file), source_sha256 = as.character(source_sha256),
@@ -509,9 +593,12 @@ collate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict = 
       status = if (sum(current$populated %in% TRUE & !current$mapped %in% TRUE) > 0L) "warning" else "success"
     )
   })
+  provenance_products <- .epi_collation_provenance(extraction_manifest, paths$manifest, forms_ids)
   diagnostics <- paste(
     "# Initial Epi Collation Diagnostics", "",
-    paste0("Dictionary version: ", version), paste0("Forms processed: ", length(forms_ids)), "",
+    paste0("Dictionary version: ", version), paste0("Forms attempted: ", nrow(extraction_manifest)),
+    paste0("Successful extractions: ", nrow(successful_manifest)), paste0("Failed extractions: ", nrow(manifest_result$failures)),
+    paste0("Forms collated: ", length(forms_ids)), "",
     "Dictionary coverage:", paste0("- Expected fields: ", nrow(dictionary$fields)), paste0("- Mapped fields: ", sum(coverage$mapped)), paste0("- Unmapped fields: ", sum(!coverage$mapped)), "",
     "Populated-field coverage:", paste0("- Populated responses: ", sum(mapped$populated %in% TRUE)), paste0("- Successfully mapped: ", sum(mapped$populated %in% TRUE & mapped$mapped %in% TRUE)), paste0("- Unmapped: ", sum(mapped$populated %in% TRUE & !mapped$mapped %in% TRUE)), "",
     "Repeated records:", paste0("- ", names(table_result$outputs), ": ", vapply(table_result$outputs, nrow, integer(1))), "",
@@ -524,7 +611,8 @@ collate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict = 
     imported_materials = table_result$outputs$imported_materials, worker_visits = table_result$outputs$worker_visits,
     crews = table_result$outputs$crews, visitors = table_result$outputs$visitors, shared_equipment = table_result$outputs$shared_equipment,
     bird_movements = table_result$outputs$bird_movements, egg_movements = table_result$outputs$egg_movements,
-    coverage = coverage, manifest = collation_manifest, parse_diagnostics = table_result$diagnostics
+    coverage = coverage, manifest = collation_manifest, parse_diagnostics = table_result$diagnostics,
+    extraction_provenance = provenance_products
   )
   if (isTRUE(write)) {
     collated_dir <- fs::path(out_dir, "collated")
@@ -535,6 +623,8 @@ collate_epi <- function(out_dir, version = "2024-05-28", write = TRUE, strict = 
     purrr::iwalk(table_result$outputs, ~ write_csv_utf8(.x, fs::path(collated_dir, paste0(.epi_table_output_names[[.y]], ".csv"))))
     write_csv_utf8(coverage, fs::path(collated_dir, "dictionary_coverage.csv"))
     write_csv_utf8(collation_manifest, fs::path(collated_dir, "collation_manifest.csv"))
+    write_csv_utf8(provenance_products$details, fs::path(collated_dir, "collation_provenance.csv"))
+    write_csv_utf8(provenance_products$summary, fs::path(collated_dir, "collation_batch_summary.csv"))
     write_csv_utf8(table_counts, fs::path(collated_dir, "collation_table_counts.csv"))
     write_csv_utf8(result$parse_diagnostics, fs::path(collated_dir, "collation_parse_diagnostics.csv"))
     writeLines(diagnostics, fs::path(collated_dir, "collation_diagnostics.md"), useBytes = TRUE)

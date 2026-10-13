@@ -1,4 +1,4 @@
-.synthetic_validation_output <- function(values = list(), values_by_form = NULL) {
+.synthetic_validation_output <- function(values = list(), values_by_form = NULL, failed_manifest = NULL) {
   dictionary <- bcapture:::load_epi_dictionary()
   out_dir <- tempfile("epi-validate-")
   dir.create(file.path(out_dir, "combined"), recursive = TRUE)
@@ -36,8 +36,9 @@
     schema_group = "synthetic-schema", extraction_method = "synthetic", pypdf_version = NA_character_,
     extracted_at_utc = "2024-05-28T00:00:00Z"
   ))
+  if (!is.null(failed_manifest)) manifest <- dplyr::bind_rows(manifest, failed_manifest)
   readr::write_csv(field_rows, file.path(out_dir, "combined", "epi_fields_long.csv"), na = "")
-  readr::write_csv(dplyr::select(manifest, form_id, form_type, source_file, source_relpath, source_sha256, form_schema_hash, schema_group), file.path(out_dir, "combined", "epi_metadata.csv"), na = "")
+  readr::write_csv(dplyr::filter(manifest, status == "success") |> dplyr::select(form_id, form_type, source_file, source_relpath, source_sha256, form_schema_hash, schema_group), file.path(out_dir, "combined", "epi_metadata.csv"), na = "")
   readr::write_csv(manifest, file.path(out_dir, "extraction_manifest.csv"), na = "")
   bcapture::collate_epi(out_dir, quiet = TRUE)
   out_dir
@@ -69,6 +70,36 @@ test_that("clean synthetic output returns the exact typed zero-finding result", 
   expect_equal(names(result), names(bcapture:::new_validation_results()))
   expect_equal(vapply(result, class, character(1)), vapply(bcapture:::new_validation_results(), class, character(1)))
   expect_true(all(file.exists(file.path(out_dir, "validation", c("validation_results.csv", "validation_summary.csv", "validation_form_summary.csv", "validation_report.md")))))
+})
+
+test_that("validate_epi validates only successful forms in a mixed batch", {
+  failed <- tibble::tribble(
+    ~form_id, ~form_type, ~source_file, ~source_relpath, ~source_sha256, ~status, ~failure_type,
+    "failed_scan", "initial_epi", "failed_scan.pdf", "failed_scan.pdf", "sha-failed_scan", "failed", "no_usable_digital_content",
+    "failed_layout", "initial_epi", "failed_layout.pdf", "failed_layout.pdf", "sha-failed_layout", "failed", "unexpected_form_type"
+  )
+  out_dir <- .synthetic_validation_output(
+    values_by_form = list(synthetic_1 = list(p0001 = "05/28/2024"), synthetic_2 = list(p0001 = "05/28/2024")),
+    failed_manifest = failed
+  )
+  result <- bcapture::validate_epi(out_dir, quiet = TRUE, write = TRUE)
+  expect_equal(nrow(result), 0L)
+  extraction <- attr(result, "extraction_summary")
+  expect_equal(extraction$total_forms_attempted, 4L)
+  expect_equal(extraction$successful_extractions, 2L)
+  expect_equal(extraction$failed_extractions, 2L)
+  expect_equal(extraction$forms_validated, 2L)
+  expect_true(file.exists(file.path(out_dir, "validation", "extraction_provenance.csv")))
+  expect_false(any(c("failed_scan", "failed_layout") %in% readr::read_csv(file.path(out_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)$form_id))
+})
+
+test_that("validate_epi fails clearly when no extraction succeeded", {
+  out_dir <- .synthetic_validation_output(values = list(p0001 = "05/28/2024"))
+  manifest <- readr::read_csv(file.path(out_dir, "extraction_manifest.csv"), show_col_types = FALSE)
+  manifest$status <- "failed"
+  manifest$failure_type <- "no_usable_digital_content"
+  readr::write_csv(manifest, file.path(out_dir, "extraction_manifest.csv"), na = "")
+  expect_error(bcapture::validate_epi(out_dir, quiet = TRUE), "no successfully extracted Initial Epi forms")
 })
 
 test_that("date-expression fields remain raw without scalar-date warnings or chronology cascades", {

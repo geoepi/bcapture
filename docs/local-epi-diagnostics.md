@@ -109,14 +109,12 @@ controlled failures, with all 39 prior field tables unchanged. All 46 source
 PDFs retain identical SHA-256 hashes, byte sizes, and modification times
 (120,536,514 bytes total).
 
-The established `collate_epi()` API requires an all-success extraction manifest.
-For integration, a derived subset was created inside the authorized confidential
-output root, strictly retaining the 40 successful IDs and excluding the six
-failures. Required field and metadata coverage was verified; canonical extraction
-products remained byte-identical. A private derivation manifest records retained
-and excluded IDs/counts, the source-manifest hash, and derived-product hashes.
-No PDFs were copied. The existing collation, semantic-validation, and
-de-identification APIs use the established dictionary and privacy rules.
+The established `collate_epi()` API accepts a mixed extraction manifest when at
+least one form succeeds. It strictly retains successful IDs, excludes failed
+IDs from semantic products, and writes attempted/success/failed counts,
+failure classes, the source-manifest hash, and excluded-form provenance. No
+PDFs are copied. The existing semantic-validation and de-identification APIs
+use the established dictionary and privacy rules on the successful subset.
 Collation completed in strict mode. Semantic validation retained 172 findings:
 170 warnings and two errors in one form; form statuses are 20 valid, 19 review,
 and one error. The

@@ -2,7 +2,7 @@
 "analysis","premid","premises_id","","direct_identifier","pseudonymize","premises","NA","Stable premises pseudonym; exact source value retained only in private crosswalk."
 "analysis","premname","premises_name","","direct_identifier","pseudonymize","premises","NA","Stable premises pseudonym; exact source value retained only in private crosswalk."
 "analysis","premadd","premises_address","","direct_identifier","drop","NA","NA","Removed because it has no approved analytical value."
-"analysis","premcnty","premises_county","","quasi_identifier","retain","NA","NA","Approved county-level geography retained; no geocoding is performed."
+"analysis","premcnty","premises_county","","quasi_identifier","retain","NA","NA","County is retained exactly as entered as coarse administrative geography; no normalization, validation, geocoding, or external geography is applied."
 "analysis","ownname","premises_owner_name","","direct_identifier","pseudonymize","entity","NA","Ambiguous person or organization value; exact normalized repeats share an opaque entity pseudonym."
 "analysis","ownph","premises_owner_phone","","direct_identifier","drop","NA","NA","Removed because it has no approved analytical value."
 "analysis","owneml","premises_owner_email","","direct_identifier","drop","NA","NA","Removed because it has no approved analytical value."

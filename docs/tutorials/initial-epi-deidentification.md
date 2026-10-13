@@ -114,7 +114,8 @@ analytical joins without exposing the original identifying values.
 Under the current analysis profile:
 
 ~~~
-county               retained where approved
+county               retained exactly as entered where supplied
+state                no independent Initial Epi field; never synthesized
 street address       removed
 exact latitude        removed
 exact longitude       removed

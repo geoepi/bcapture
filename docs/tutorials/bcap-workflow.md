@@ -137,8 +137,10 @@ validate_hpai_privacy()
 ~~~
 
 validate_hpai() applies only checks supported by the extracted schema:
-controlled extraction failures, categorical domains, date parsing, and field
-type coverage. It does not infer undocumented business rules.
+record-level extraction failures are retained in the manifest and excluded
+from semantic validation, while successful records are checked for categorical
+domains, date parsing, and field-type coverage. A batch must contain at least
+one successful record. It does not infer undocumented business rules.
 
 deidentify_hpai() accepts an extracted output directory, not raw PDFs. Use
 separate operational paths for confidential extraction, safe output, and the

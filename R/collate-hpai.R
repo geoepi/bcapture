@@ -254,7 +254,8 @@ utils::globalVariables(c("entity_id", "entity_scope", "metric", "product"))
   .phase3_required_columns(x, required, paste0(form_type, " record crosswalk"))
   id_col <- if (identical(form_type, "epi")) "case_id" else "record_id"
   if (anyDuplicated(x[[id_col]]) || anyDuplicated(x$source_key)) stop(form_type, " crosswalk is not one-to-one.", call. = FALSE)
-  if (!setequal(as.character(x[[id_col]]), as.character(record_ids))) stop(form_type, " crosswalk does not exactly cover the safe records.", call. = FALSE)
+  if (length(setdiff(as.character(record_ids), as.character(x[[id_col]]))) > 0L) stop(form_type, " crosswalk does not cover all safe records.", call. = FALSE)
+  x <- x[as.character(x[[id_col]]) %in% as.character(record_ids), , drop = FALSE]
   x <- x[match(record_ids, x[[id_col]]), , drop = FALSE]
   with_key <- .phase3_nonmissing(x$premises_key)
   if (any(vapply(split(as.character(x$premises_pseudonym[with_key]), as.character(x$premises_key[with_key])), function(values) length(unique(values[.phase3_nonmissing(values)])) > 1L, logical(1)))) stop(form_type, " crosswalk has ambiguous premises mappings.", call. = FALSE)
@@ -270,7 +271,7 @@ utils::globalVariables(c("entity_id", "entity_scope", "metric", "product"))
 }
 
 .phase3_bcap_safe_entity <- function(fields, record_ids) {
-  candidate_fields <- c("npin", "premisesfarm_name", "prem_special_id")
+  candidate_fields <- c("npin", "NPIN", "premisesfarm_name", "prem_special_id")
   candidates <- fields[fields$field %in% candidate_fields & .phase3_nonmissing(fields$value), c("record_id", "value"), drop = FALSE]
   result <- stats::setNames(rep(NA_character_, length(record_ids)), record_ids)
   for (record_id in record_ids) {

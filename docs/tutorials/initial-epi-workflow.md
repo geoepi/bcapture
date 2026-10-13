@@ -69,6 +69,12 @@ Enter `Daily` in a field that expects a scalar calendar date in
 `epi_demo_review.pdf`. This creates a deliberate synthetic data-quality
 finding. It is optional for users who only want a normal successful workflow.
 
+Extraction and validation are record-level. A mixed batch can continue when
+some PDFs fail extraction: successful forms proceed, failed forms remain in
+the extraction/QA provenance, and failed forms are excluded from semantic,
+de-identified, and Phase 3 analytical records. An all-failed batch stops
+because there is no successful form to process.
+
 ## Extract one form
 
 ~~~r

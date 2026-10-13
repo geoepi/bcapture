@@ -13,11 +13,13 @@ PDFs
 ~~~
 
 validate_hpai() evaluates the extraction manifest and long field table. It
-allows only the known unrecognized_flattened_form outcome as an excluded
-record class. It checks categorical responses against extracted button/choice
-domains, normalizes the documented BCAP date fields, and rejects unknown field
-types or incomplete successful extraction products. It does not infer
-undocumented business rules, table semantics, or cross-field contradictions.
+validates successful extracted records while retaining every classified
+failure row as extraction provenance. A mixed batch proceeds when at least one
+record succeeds; an all-failed batch stops clearly. It checks categorical
+responses against extracted button/choice domains, normalizes the documented
+BCAP date fields, and rejects unknown field types or incomplete successful
+extraction products. It does not infer undocumented business rules, table
+semantics, or cross-field contradictions.
 
 ## Privacy classification
 
@@ -25,10 +27,10 @@ The canonical 2025-12-08 BCAP template contains 225 fields:
 
 | Classification | Count | Policy |
 | --- | ---: | --- |
-| SAFE_RETAIN | 160 | Audit controls, categorical responses, and signature presence |
+| SAFE_RETAIN | 162 | Audit controls, categorical responses, signature presence, and county/state coarse geography |
 | SAFE_NORMALIZE | 3 | Deterministic ISO normalization for BCAP date fields |
 | PSEUDONYMIZE | 15 | Premises, person, organization, phone, and email linkage |
-| WITHHOLD | 47 | Facility locations, technical fields, and arbitrary text |
+| WITHHOLD | 45 | Precise facility location, technical fields, and arbitrary text |
 | CROSSWALK_ONLY | 0 | Reserved for future explicit policy |
 | REVIEW | 0 | Unknown field types fail closed rather than entering output |
 
@@ -39,10 +41,11 @@ count must not replace the canonical 225-field count: unobserved canonical
 fields remain governed by the same fail-closed policy when they appear.
 
 The policy is conservative. It does not claim unrestricted public-release
-anonymization. Facility locations and arbitrary text are withheld because no
-BCAP-specific release policy or robust text scrubber is established. Direct
-identifiers are replaced by stable pseudonyms, and original values remain only
-in the private crosswalk.
+anonymization. Premises address, city, ZIP, and GPS coordinates, along with
+arbitrary text, are withheld. `prem_county` and `prem_state` are intentionally
+retained as coarse administrative geography exactly as entered; they are not
+normalized, validated, geocoded, or crosswalked. Direct identifiers are replaced
+by stable pseudonyms, and original values remain only in the private crosswalk.
 
 The /Sig values are structural: populated signatures are
 signature_present; signer, certificate, timestamp, ByteRange, and Contents

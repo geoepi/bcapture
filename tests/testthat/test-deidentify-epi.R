@@ -1,4 +1,4 @@
-.deid_synthetic_output <- function(values = list(), schemas = c("schema_a")) {
+.deid_synthetic_output <- function(values = list(), schemas = c("schema_a"), failed_manifest = NULL) {
   dictionary <- bcapture:::load_epi_dictionary()
   out_dir <- tempfile("epi-deid-source-")
   dir.create(file.path(out_dir, "combined"), recursive = TRUE)
@@ -35,8 +35,9 @@
     form_schema_hash = schema, schema_group = schema, extraction_method = "synthetic",
     pypdf_version = NA_character_, extracted_at_utc = "2024-05-28T00:00:00Z"
   ))
+  if (!is.null(failed_manifest)) manifest <- dplyr::bind_rows(manifest, failed_manifest)
   readr::write_csv(field_rows, file.path(out_dir, "combined", "epi_fields_long.csv"), na = "")
-  readr::write_csv(dplyr::select(manifest, form_id, form_type, source_file, source_relpath, source_sha256, form_schema_hash, schema_group), file.path(out_dir, "combined", "epi_metadata.csv"), na = "")
+  readr::write_csv(dplyr::filter(manifest, status == "success") |> dplyr::select(form_id, form_type, source_file, source_relpath, source_sha256, form_schema_hash, schema_group), file.path(out_dir, "combined", "epi_metadata.csv"), na = "")
   readr::write_csv(manifest, file.path(out_dir, "extraction_manifest.csv"), na = "")
   bcapture::collate_epi(out_dir, quiet = TRUE)
   out_dir
@@ -178,6 +179,54 @@ test_that("deidentify_epi protects direct identifiers and preserves analytical t
   expect_equal(source_forms, readr::read_csv(file.path(source_dir, "collated", "epi_forms.csv"), show_col_types = FALSE))
 })
 
+test_that("Initial Epi retains county literally and never synthesizes state", {
+  values <- .deid_values()
+  values$premcnty <- "Mercer   007"
+  source_dir <- .deid_synthetic_output(list(synthetic_1 = values))
+  deid_dir <- tempfile("epi-deid-geography-output-")
+  crosswalk_dir <- tempfile("epi-deid-geography-crosswalk-")
+  result <- bcapture::deidentify_epi(source_dir, deid_dir, crosswalk_dir, quiet = TRUE)
+  expect_identical(result$status, "passed")
+
+  rules <- bcapture:::.epi_deid_load_rules("2024-05-28", "analysis", bcapture:::load_epi_dictionary())
+  county_rule <- rules[rules$raw_field == "premcnty", , drop = FALSE]
+  expect_equal(county_rule$canonical_name, "premises_county")
+  expect_equal(county_rule$privacy_class, "quasi_identifier")
+  expect_equal(county_rule$action, "retain")
+
+  output_forms <- readr::read_csv(file.path(deid_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)
+  output_responses <- readr::read_csv(file.path(deid_dir, "collated", "epi_responses_long.csv"), show_col_types = FALSE)
+  expect_true("premises_county" %in% names(output_forms))
+  expect_identical(output_forms$premises_county[[1L]], "Mercer   007")
+  expect_false(any(grepl("state", names(output_forms), ignore.case = TRUE)))
+  expect_false(any(rules$canonical_name == "premises_state"))
+  expect_true(is.na(output_forms$premises_address[[1L]]))
+  expect_true(is.na(output_forms$premises_latitude[[1L]]))
+  expect_true(is.na(output_forms$premises_longitude[[1L]]))
+  county_response <- output_responses[output_responses$raw_field == "premcnty", , drop = FALSE]
+  expect_true(nrow(county_response) > 0L)
+  expect_true(any(county_response$value == "Mercer   007"))
+})
+
+test_that("Initial Epi de-identification excludes failed source forms", {
+  failed <- tibble::tribble(
+    ~form_id, ~form_type, ~source_file, ~source_relpath, ~source_sha256, ~status, ~failure_type,
+    "failed_scan", "initial_epi", "failed_scan.pdf", "failed_scan.pdf", "sha-failed_scan", "failed", "no_usable_digital_content"
+  )
+  source_dir <- .deid_synthetic_output(list(synthetic_1 = .deid_values()), failed_manifest = failed)
+  deid_dir <- tempfile("epi-deid-mixed-output-")
+  crosswalk_dir <- tempfile("epi-deid-mixed-crosswalk-")
+  result <- bcapture::deidentify_epi(source_dir, deid_dir, crosswalk_dir, quiet = TRUE)
+  expect_identical(result$status, "passed")
+  forms <- readr::read_csv(file.path(deid_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)
+  expect_equal(nrow(forms), 1L)
+  expect_false("failed_scan" %in% forms$case_id)
+  provenance <- readr::read_csv(file.path(deid_dir, "privacy", "extraction_provenance.csv"), show_col_types = FALSE)
+  expect_equal(provenance$total_forms_attempted, 2L)
+  expect_equal(provenance$successful_extractions, 1L)
+  expect_equal(provenance$failed_extractions, 1L)
+})
+
 test_that("crosswalk reuse is stable and extension does not renumber", {
   crosswalk_dir <- tempfile("epi-deid-reuse-crosswalk-")
   source_one <- .deid_synthetic_output(list(synthetic_1 = .deid_values()))
@@ -199,6 +248,22 @@ test_that("crosswalk reuse is stable and extension does not renumber", {
   expect_true(all(grepl("^CASE-[0-9]{6}$", record_crosswalk$case_id)))
   expect_equal(first$status, "passed")
   expect_equal(second$status, "passed")
+})
+
+test_that("same premises key shares one pseudonym within a batch", {
+  source_dir <- .deid_synthetic_output(
+    list(synthetic_1 = .deid_values(), synthetic_2 = .deid_values(owner = "Second Owner")),
+    schemas = c("schema_a", "schema_a")
+  )
+  deid_dir <- tempfile("epi-deid-shared-premises-output-")
+  crosswalk_dir <- tempfile("epi-deid-shared-premises-crosswalk-")
+  result <- bcapture::deidentify_epi(source_dir, deid_dir, crosswalk_dir, quiet = TRUE)
+  expect_identical(result$status, "passed")
+  forms <- readr::read_csv(file.path(deid_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)
+  expect_equal(forms$premises_id[[1L]], forms$premises_id[[2L]])
+  record_crosswalk <- readr::read_csv(file.path(crosswalk_dir, "record_crosswalk.csv"), show_col_types = FALSE)
+  expect_equal(length(unique(record_crosswalk$premises_pseudonym)), 1L)
+  expect_equal(length(unique(record_crosswalk$premises_key)), 1L)
 })
 
 test_that("path safety rejects nested and version-controlled crosswalks", {

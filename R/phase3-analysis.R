@@ -16,12 +16,18 @@
 
 .phase3_source_counts <- function(manifest, safe_n) {
   if (is.null(manifest)) {
-    return(c(discovered = safe_n, supported = safe_n, unsupported = 0L, extraction_failure = 0L))
+    return(list(discovered = as.integer(safe_n), supported = as.integer(safe_n), unsupported = 0L, extraction_failure = 0L, failure_types = NA_character_))
   }
   status <- tolower(as.character(manifest$status))
-  c(
-    discovered = nrow(manifest), supported = sum(status == "success"),
-    unsupported = sum(status != "success"), extraction_failure = sum(status != "success")
+  failures <- manifest[status != "success", , drop = FALSE]
+  failure_types <- if (nrow(failures) == 0L || !"failure_type" %in% names(failures)) NA_character_ else {
+    counts <- sort(table(as.character(failures$failure_type)))
+    paste(paste(names(counts), as.integer(counts), sep = "="), collapse = "|")
+  }
+  list(
+    discovered = as.integer(nrow(manifest)), supported = as.integer(sum(status == "success")),
+    unsupported = as.integer(sum(status != "success")), extraction_failure = as.integer(sum(status != "success")),
+    failure_types = failure_types
   )
 }
 .phase3_read_source_manifest <- function(path, label) {
@@ -205,6 +211,7 @@
     safe_records = nrow(records), repeated_items = nrow(repeated), metadata_rows = nrow(metadata),
     source_files_discovered = qa$source_counts[["discovered"]], source_files_supported = qa$source_counts[["supported"]],
     source_files_unsupported = qa$source_counts[["unsupported"]], semantic_status = if (qa$metrics$value[qa$metrics$metric == "semantic_warnings"] > 0L) "passed_with_warnings" else "passed",
+    source_failure_types = qa$source_counts[["failure_types"]],
     privacy_status = if (qa$metrics$value[qa$metrics$metric == "privacy_errors"] + qa$metrics$value[qa$metrics$metric == "privacy_warnings"] == 0L) "passed" else "failed",
     qa_status = qa$status, accepted_warning_policy = if (qa$status == "passed_with_warnings") "documented_non_blocking_semantic_or_type_warnings" else "none",
     output_hashes = paste(paste(hashes$product, hashes$format, hashes$sha256, sep = ":"), collapse = ";")

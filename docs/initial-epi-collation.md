@@ -10,6 +10,13 @@ metadata. `collate_epi()` reads that canonical long product plus the extraction
 manifest and metadata. It does not re-run extraction and does not use the
 convenience wide or populated-only products as its source.
 
+Extraction is record-level. A batch may contain both successful and failed
+PDFs. `collate_epi()` requires at least one successful extraction, collates
+only successful form IDs, and preserves attempted/success/failed counts,
+failure classes, and the extraction-manifest hash in
+`collation_batch_summary.csv` and `collation_provenance.csv`. A failed PDF is
+never converted into a blank semantic record.
+
 Collation is not extraction validation: a successful extraction can still
 produce semantic parse diagnostics or later validation findings. Raw source
 values remain available for review, and normalization occurs before typed

@@ -1,4 +1,4 @@
-.synthetic_epi_output <- function(values = list(), schemas = c("schema_a"), unknown = FALSE) {
+.synthetic_epi_output <- function(values = list(), schemas = c("schema_a"), unknown = FALSE, failed_manifest = NULL) {
   dictionary <- bcapture:::load_epi_dictionary()
   out_dir <- tempfile("epi-collate-")
   dir.create(file.path(out_dir, "combined"), recursive = TRUE)
@@ -45,7 +45,9 @@
     number_of_populated_fields = sum(field_rows$form_id == .x & field_rows$is_populated), form_schema_hash = .y,
     schema_group = .y, extraction_method = "synthetic", pypdf_version = NA_character_, extracted_at_utc = "2024-05-28T00:00:00Z"
   ))
+  if (!is.null(failed_manifest)) manifest <- dplyr::bind_rows(manifest, failed_manifest)
   metadata <- manifest |>
+    dplyr::filter(status == "success") |>
     dplyr::select(form_id, form_type, source_file, source_relpath, source_sha256, form_schema_hash, schema_group)
   readr::write_csv(field_rows, file.path(out_dir, "combined", "epi_fields_long.csv"), na = "")
   readr::write_csv(metadata, file.path(out_dir, "combined", "epi_metadata.csv"), na = "")
@@ -105,6 +107,40 @@ test_that("collate_epi preserves codebooks, provenance, and repeated records", {
   expect_equal(result$egg_movements$material_type, "eggs")
   expect_true(file.exists(file.path(out_dir, "collated", "epi_responses_long.csv")))
   expect_true(file.exists(file.path(out_dir, "collated", "collation_diagnostics.md")))
+})
+
+test_that("collate_epi processes successful records from a mixed extraction batch", {
+  failed <- tibble::tribble(
+    ~form_id, ~form_type, ~source_file, ~source_relpath, ~source_sha256, ~status, ~failure_type,
+    "failed_scan", "initial_epi", "failed_scan.pdf", "failed_scan.pdf", "sha-failed_scan", "failed", "no_usable_digital_content",
+    "failed_layout", "initial_epi", "failed_layout.pdf", "failed_layout.pdf", "sha-failed_layout", "failed", "unexpected_form_type"
+  )
+  out_dir <- .synthetic_epi_output(
+    list(synthetic_1 = list(premid = "SYNTHETIC-PREMISES-001", p0001 = "05/28/2024")),
+    failed_manifest = failed
+  )
+  result <- collate_epi(out_dir, quiet = TRUE)
+
+  expect_equal(nrow(result$forms), 1L)
+  expect_identical(result$forms$form_id, "synthetic_1")
+  expect_false(any(c("failed_scan", "failed_layout") %in% result$forms$form_id))
+  expect_equal(result$extraction_provenance$summary$total_forms_attempted, 3L)
+  expect_equal(result$extraction_provenance$summary$successful_extractions, 1L)
+  expect_equal(result$extraction_provenance$summary$failed_extractions, 2L)
+  expect_equal(result$extraction_provenance$summary$forms_collated, 1L)
+  expect_true(all(c("failed_scan", "failed_layout") %in% result$extraction_provenance$details$form_id))
+  expect_true(all(result$extraction_provenance$details$collation_status[result$extraction_provenance$details$extraction_status == "failed"] == "excluded_extraction_failure"))
+  expect_true(file.exists(file.path(out_dir, "collated", "collation_provenance.csv")))
+  expect_true(file.exists(file.path(out_dir, "collated", "collation_batch_summary.csv")))
+})
+
+test_that("collate_epi fails clearly when every extraction fails", {
+  out_dir <- .synthetic_epi_output(list(synthetic_1 = list(p0001 = "05/28/2024")))
+  manifest <- readr::read_csv(file.path(out_dir, "extraction_manifest.csv"), show_col_types = FALSE)
+  manifest$status <- "failed"
+  manifest$failure_type <- "no_usable_digital_content"
+  readr::write_csv(manifest, file.path(out_dir, "extraction_manifest.csv"), na = "")
+  expect_error(collate_epi(out_dir, quiet = TRUE), "no successfully extracted Initial Epi forms")
 })
 
 test_that("quoted multiselect arrays are decoded without changing ordinary delimiters", {

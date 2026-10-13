@@ -35,14 +35,101 @@ hpai_test_products <- function(root, invalid_date = FALSE) {
   invisible(root)
 }
 
+hpai_geography_test_products <- function(root) {
+  hpai_test_products(root)
+  fields_path <- file.path(root, "combined", "hpai_fields_long.csv")
+  fields <- readr::read_csv(fields_path, show_col_types = FALSE)
+  geography <- fields[rep(1L, 6L), , drop = FALSE]
+  geography$field_index <- 8:13
+  geography$field <- c("prem_county", "prem_state", "premises_address", "prem_city", "prem_zip", "prem_gps")
+  geography$alternative_name <- c("County", "State", "Premises Address", "Premises City", "Premises ZIP", "Premises GPS")
+  geography$field_type <- rep("Tx", 6L)
+  geography$value_raw <- c("Mercer   007", "mIxEd-State  09", "123 Hidden Road", "MiXeD City", "00012-3456", "41.123 -82.456")
+  geography$value <- geography$value_raw
+  geography$states <- NA_character_
+  geography$options <- NA_character_
+  geography$is_populated <- TRUE
+  geography$extraction_method <- "acroform"
+  fields <- dplyr::bind_rows(fields, geography)
+  readr::write_csv(fields, fields_path, na = "")
+  manifest_path <- file.path(root, "extraction_manifest.csv")
+  manifest <- readr::read_csv(manifest_path, show_col_types = FALSE)
+  manifest$number_of_fields <- nrow(fields)
+  readr::write_csv(manifest, manifest_path, na = "")
+  invisible(root)
+}
+
+hpai_mixed_test_products <- function(root) {
+  hpai_test_products(root)
+  manifest_path <- file.path(root, "extraction_manifest.csv")
+  manifest <- readr::read_csv(manifest_path, show_col_types = FALSE)
+  failed <- manifest[rep(1L, 2L), , drop = FALSE]
+  failed$audit_id <- c("failed_scan", "failed_layout")
+  failed$source_file <- paste0(failed$audit_id, ".pdf")
+  failed$source_relpath <- failed$source_file
+  failed$source_md5 <- paste0("md5-", failed$audit_id)
+  failed$status <- "failed"
+  failed$failure_type <- c("no_usable_digital_content", "unexpected_form_type")
+  failed$error <- c("No usable digital content.", "Unexpected form type.")
+  readr::write_csv(dplyr::bind_rows(manifest, failed), manifest_path, na = "")
+  invisible(root)
+}
+
 test_that("BCAP policy is complete for the canonical template", {
   policy <- bcapture:::.hpai_schema_inventory(bcapture:::.hpai_template_fields())
   expect_equal(nrow(policy), 225L)
   expect_false(any(policy$privacy_class == "REVIEW"))
-  expect_equal(sum(policy$privacy_class == "SAFE_RETAIN"), 160L)
+  expect_equal(sum(policy$privacy_class == "SAFE_RETAIN"), 162L)
   expect_equal(sum(policy$privacy_class == "SAFE_NORMALIZE"), 3L)
   expect_equal(sum(policy$privacy_class == "PSEUDONYMIZE"), 15L)
-  expect_equal(sum(policy$privacy_class == "WITHHOLD"), 47L)
+  expect_equal(sum(policy$privacy_class == "WITHHOLD"), 45L)
+})
+
+test_that("BCAP retains county and state exactly while withholding precise geography", {
+  root <- tempfile("bcap-hpai-geography-")
+  hpai_geography_test_products(root)
+  safe <- tempfile("bcap-safe-geography-")
+  crosswalk <- tempfile("bcap-crosswalk-geography-")
+  result <- bcapture::deidentify_hpai(root, safe, crosswalk, quiet = TRUE)
+  expect_identical(result$status, "passed")
+
+  safe_fields <- readr::read_csv(file.path(safe, "combined", "hpai_fields_long.csv"), show_col_types = FALSE)
+  retained <- safe_fields[safe_fields$field %in% c("prem_county", "prem_state"), , drop = FALSE]
+  expect_setequal(retained$field, c("prem_county", "prem_state"))
+  expect_identical(retained$value[match("prem_county", retained$field)], "Mercer   007")
+  expect_identical(retained$value[match("prem_state", retained$field)], "mIxEd-State  09")
+  expect_true(all(retained$privacy_class == "SAFE_RETAIN"))
+  expect_true(all(retained$privacy_action == "SAFE_RETAIN"))
+
+  withheld <- safe_fields$field %in% c("premises_address", "prem_city", "prem_zip", "prem_gps")
+  expect_true(all(is.na(safe_fields$value[withheld])))
+  expect_true(all(safe_fields$privacy_class[withheld] == "WITHHOLD"))
+  expect_identical(bcapture::validate_hpai_privacy(safe, crosswalk, write = FALSE, quiet = TRUE)$status, "passed")
+})
+
+test_that("fields outside the versioned template are withheld", {
+  expect_identical(bcapture:::.hpai_field_policy("Hist2", "Btn")$privacy_class, "WITHHOLD")
+  expect_identical(bcapture:::.hpai_field_policy("Q_2_5source1a", "Ch")$privacy_class, "WITHHOLD")
+  expect_identical(bcapture:::.hpai_field_policy("Q1_3_17e", "Btn")$privacy_class, "SAFE_RETAIN")
+  expect_identical(bcapture:::.hpai_field_policy("NPIN", "Tx")$privacy_class, "PSEUDONYMIZE")
+  expect_identical(bcapture:::.hpai_canonical_field(c("NPIN", "npin")), c("npin", "npin"))
+  expect_true("NPIN" %in% field_metadata("bcap")$field_name)
+})
+
+test_that("recognized BCAP source aliases use canonical safe field names", {
+  root <- tempfile("bcap-hpai-source-alias-")
+  hpai_test_products(root)
+  fields_path <- file.path(root, "combined", "hpai_fields_long.csv")
+  fields <- readr::read_csv(fields_path, show_col_types = FALSE)
+  fields$field[fields$field == "npin"] <- "NPIN"
+  readr::write_csv(fields, fields_path, na = "")
+  safe <- tempfile("bcap-safe-source-alias-")
+  crosswalk <- tempfile("bcap-crosswalk-source-alias-")
+  result <- bcapture::deidentify_hpai(root, safe, crosswalk, quiet = TRUE)
+  expect_identical(result$status, "passed")
+  safe_fields <- readr::read_csv(file.path(safe, "combined", "hpai_fields_long.csv"), show_col_types = FALSE)
+  expect_true("npin" %in% safe_fields$field)
+  expect_false("NPIN" %in% safe_fields$field)
 })
 
 test_that("BCAP semantic validation and strict finalization pass synthetic records", {
@@ -76,6 +163,49 @@ test_that("BCAP semantic validation and strict finalization pass synthetic recor
   expect_identical(
     safe_fields$value[safe_fields$field == "npin"],
     safe_reuse_fields$value[safe_reuse_fields$field == "npin"]
+  )
+})
+
+test_that("BCAP mixed extraction manifests validate and de-identify only successes", {
+  root <- tempfile("bcap-hpai-mixed-")
+  hpai_mixed_test_products(root)
+  validation <- bcapture::validate_hpai(root, write = TRUE, quiet = TRUE)
+  expect_identical(validation$status, "passed")
+  expect_equal(validation$summary$records_evaluated, 1L)
+
+  safe <- tempfile("bcap-safe-mixed-")
+  crosswalk <- tempfile("bcap-crosswalk-mixed-")
+  result <- bcapture::deidentify_hpai(root, safe, crosswalk, quiet = TRUE)
+  expect_identical(result$status, "passed")
+  safe_fields <- readr::read_csv(file.path(safe, "combined", "hpai_fields_long.csv"), show_col_types = FALSE)
+  expect_equal(length(unique(safe_fields$record_id)), 1L)
+  expect_false(any(c("failed_scan", "failed_layout") %in% safe_fields$record_id))
+  provenance <- readr::read_csv(file.path(safe, "privacy", "extraction_provenance.csv"), show_col_types = FALSE)
+  expect_equal(provenance$total_forms_attempted, 3L)
+  expect_equal(provenance$successful_extractions, 1L)
+  expect_equal(provenance$failed_extractions, 2L)
+  expect_match(provenance$failure_types, "no_usable_digital_content=1")
+  expect_match(provenance$failure_types, "unexpected_form_type=1")
+})
+
+test_that("BCAP all-failed extraction batches fail before semantic processing", {
+  root <- tempfile("bcap-hpai-all-failed-")
+  hpai_mixed_test_products(root)
+  fields_path <- file.path(root, "combined", "hpai_fields_long.csv")
+  fields <- readr::read_csv(fields_path, show_col_types = FALSE)
+  readr::write_csv(fields[0, , drop = FALSE], fields_path, na = "")
+  manifest_path <- file.path(root, "extraction_manifest.csv")
+  manifest <- readr::read_csv(manifest_path, show_col_types = FALSE)
+  manifest$status <- "failed"
+  manifest$failure_type <- c("no_usable_digital_content", "no_usable_digital_content", "unexpected_form_type")
+  readr::write_csv(manifest, manifest_path, na = "")
+
+  validation <- bcapture::validate_hpai(root, write = FALSE, quiet = TRUE)
+  expect_identical(validation$status, "failed")
+  expect_true(any(grepl("No successful BCAP audit records", validation$findings$message, fixed = TRUE)))
+  expect_error(
+    bcapture::deidentify_hpai(root, tempfile("bcap-safe-all-failed-"), tempfile("bcap-crosswalk-all-failed-"), quiet = TRUE),
+    "semantic validation"
   )
 })
 
