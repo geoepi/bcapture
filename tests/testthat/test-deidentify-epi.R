@@ -179,6 +179,35 @@ test_that("deidentify_epi protects direct identifiers and preserves analytical t
   expect_equal(source_forms, readr::read_csv(file.path(source_dir, "collated", "epi_forms.csv"), show_col_types = FALSE))
 })
 
+test_that("Initial Epi retains county literally and never synthesizes state", {
+  values <- .deid_values()
+  values$premcnty <- "Mercer   007"
+  source_dir <- .deid_synthetic_output(list(synthetic_1 = values))
+  deid_dir <- tempfile("epi-deid-geography-output-")
+  crosswalk_dir <- tempfile("epi-deid-geography-crosswalk-")
+  result <- bcapture::deidentify_epi(source_dir, deid_dir, crosswalk_dir, quiet = TRUE)
+  expect_identical(result$status, "passed")
+
+  rules <- bcapture:::.epi_deid_load_rules("2024-05-28", "analysis", bcapture:::load_epi_dictionary())
+  county_rule <- rules[rules$raw_field == "premcnty", , drop = FALSE]
+  expect_equal(county_rule$canonical_name, "premises_county")
+  expect_equal(county_rule$privacy_class, "quasi_identifier")
+  expect_equal(county_rule$action, "retain")
+
+  output_forms <- readr::read_csv(file.path(deid_dir, "collated", "epi_forms.csv"), show_col_types = FALSE)
+  output_responses <- readr::read_csv(file.path(deid_dir, "collated", "epi_responses_long.csv"), show_col_types = FALSE)
+  expect_true("premises_county" %in% names(output_forms))
+  expect_identical(output_forms$premises_county[[1L]], "Mercer   007")
+  expect_false(any(grepl("state", names(output_forms), ignore.case = TRUE)))
+  expect_false(any(rules$canonical_name == "premises_state"))
+  expect_true(is.na(output_forms$premises_address[[1L]]))
+  expect_true(is.na(output_forms$premises_latitude[[1L]]))
+  expect_true(is.na(output_forms$premises_longitude[[1L]]))
+  county_response <- output_responses[output_responses$raw_field == "premcnty", , drop = FALSE]
+  expect_true(nrow(county_response) > 0L)
+  expect_true(any(county_response$value == "Mercer   007"))
+})
+
 test_that("Initial Epi de-identification excludes failed source forms", {
   failed <- tibble::tribble(
     ~form_id, ~form_type, ~source_file, ~source_relpath, ~source_sha256, ~status, ~failure_type,

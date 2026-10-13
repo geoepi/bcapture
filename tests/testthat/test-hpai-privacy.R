@@ -35,6 +35,30 @@ hpai_test_products <- function(root, invalid_date = FALSE) {
   invisible(root)
 }
 
+hpai_geography_test_products <- function(root) {
+  hpai_test_products(root)
+  fields_path <- file.path(root, "combined", "hpai_fields_long.csv")
+  fields <- readr::read_csv(fields_path, show_col_types = FALSE)
+  geography <- fields[rep(1L, 6L), , drop = FALSE]
+  geography$field_index <- 8:13
+  geography$field <- c("prem_county", "prem_state", "premises_address", "prem_city", "prem_zip", "prem_gps")
+  geography$alternative_name <- c("County", "State", "Premises Address", "Premises City", "Premises ZIP", "Premises GPS")
+  geography$field_type <- rep("Tx", 6L)
+  geography$value_raw <- c("Mercer   007", "mIxEd-State  09", "123 Hidden Road", "MiXeD City", "00012-3456", "41.123 -82.456")
+  geography$value <- geography$value_raw
+  geography$states <- NA_character_
+  geography$options <- NA_character_
+  geography$is_populated <- TRUE
+  geography$extraction_method <- "acroform"
+  fields <- dplyr::bind_rows(fields, geography)
+  readr::write_csv(fields, fields_path, na = "")
+  manifest_path <- file.path(root, "extraction_manifest.csv")
+  manifest <- readr::read_csv(manifest_path, show_col_types = FALSE)
+  manifest$number_of_fields <- nrow(fields)
+  readr::write_csv(manifest, manifest_path, na = "")
+  invisible(root)
+}
+
 hpai_mixed_test_products <- function(root) {
   hpai_test_products(root)
   manifest_path <- file.path(root, "extraction_manifest.csv")
@@ -55,10 +79,32 @@ test_that("BCAP policy is complete for the canonical template", {
   policy <- bcapture:::.hpai_schema_inventory(bcapture:::.hpai_template_fields())
   expect_equal(nrow(policy), 225L)
   expect_false(any(policy$privacy_class == "REVIEW"))
-  expect_equal(sum(policy$privacy_class == "SAFE_RETAIN"), 160L)
+  expect_equal(sum(policy$privacy_class == "SAFE_RETAIN"), 162L)
   expect_equal(sum(policy$privacy_class == "SAFE_NORMALIZE"), 3L)
   expect_equal(sum(policy$privacy_class == "PSEUDONYMIZE"), 15L)
-  expect_equal(sum(policy$privacy_class == "WITHHOLD"), 47L)
+  expect_equal(sum(policy$privacy_class == "WITHHOLD"), 45L)
+})
+
+test_that("BCAP retains county and state exactly while withholding precise geography", {
+  root <- tempfile("bcap-hpai-geography-")
+  hpai_geography_test_products(root)
+  safe <- tempfile("bcap-safe-geography-")
+  crosswalk <- tempfile("bcap-crosswalk-geography-")
+  result <- bcapture::deidentify_hpai(root, safe, crosswalk, quiet = TRUE)
+  expect_identical(result$status, "passed")
+
+  safe_fields <- readr::read_csv(file.path(safe, "combined", "hpai_fields_long.csv"), show_col_types = FALSE)
+  retained <- safe_fields[safe_fields$field %in% c("prem_county", "prem_state"), , drop = FALSE]
+  expect_setequal(retained$field, c("prem_county", "prem_state"))
+  expect_identical(retained$value[match("prem_county", retained$field)], "Mercer   007")
+  expect_identical(retained$value[match("prem_state", retained$field)], "mIxEd-State  09")
+  expect_true(all(retained$privacy_class == "SAFE_RETAIN"))
+  expect_true(all(retained$privacy_action == "SAFE_RETAIN"))
+
+  withheld <- safe_fields$field %in% c("premises_address", "prem_city", "prem_zip", "prem_gps")
+  expect_true(all(is.na(safe_fields$value[withheld])))
+  expect_true(all(safe_fields$privacy_class[withheld] == "WITHHOLD"))
+  expect_identical(bcapture::validate_hpai_privacy(safe, crosswalk, write = FALSE, quiet = TRUE)$status, "passed")
 })
 
 test_that("fields outside the versioned template are withheld", {

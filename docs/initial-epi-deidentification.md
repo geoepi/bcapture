@@ -56,9 +56,11 @@ Direct identifiers such as premises IDs, premises names, people, organizations,
 and combined contact strings are replaced with opaque crosswalk-backed
 pseudonyms where their relationships are useful. Dedicated phone and email
 fields, street addresses, and exact premises latitude/longitude are dropped.
-County is retained where supplied as a structured field. Source filenames,
-relative paths, source checksums, and raw entered values are not carried into
-the analysis outputs.
+County is retained where supplied as the structured `premcnty` field, exactly as
+entered. The Initial Epi dictionary has no independent state field, so no state
+variable is synthesized from address, county, ZIP, GPS, filenames, or external
+geography. Source filenames, relative paths, source checksums, and other raw
+entered values are not carried into the analysis outputs.
 
 Dates and scientifically necessary numeric values are retained by the analysis
 profile as explicit quasi-identifiers. This is intentional and is one reason

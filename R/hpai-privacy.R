@@ -13,9 +13,10 @@ utils::globalVariables(c(
 )
 
 .hpai_date_fields <- c("initial_audit_date", "audit_pass_date", "Producer_date")
-.hpai_location_fields <- c(
-  "premises_address", "prem_city", "prem_county", "prem_state", "prem_zip", "prem_gps"
+.hpai_withheld_location_fields <- c(
+  "premises_address", "prem_city", "prem_zip", "prem_gps"
 )
+.hpai_retained_geography_fields <- c("prem_county", "prem_state")
 .hpai_premises_fields <- c("npin", "NPIN", "premisesfarm_name", "prem_special_id")
 .hpai_technical_fields <- c("FileNameField", "FileNameGen", "SaveAs")
 
@@ -80,11 +81,18 @@ utils::globalVariables(c(
       notes = "Date is retained only after deterministic ISO-date normalization."
     ))
   }
-  if (field %in% .hpai_location_fields) {
+  if (field %in% .hpai_retained_geography_fields) {
+    return(list(
+      privacy_class = "SAFE_RETAIN", identifier_class = "quasi_identifier",
+      pseudonym_class = NA_character_, free_text = FALSE, linkage_required = FALSE,
+      notes = "Coarse administrative geography is intentionally retained exactly as entered; no normalization, validation, geocoding, or crosswalk is applied."
+    ))
+  }
+  if (field %in% .hpai_withheld_location_fields) {
     return(list(
       privacy_class = "WITHHOLD", identifier_class = "location",
       pseudonym_class = NA_character_, free_text = FALSE, linkage_required = FALSE,
-      notes = "Facility location is withheld because BCAP-specific release policy is not established."
+      notes = "Precise facility geography is withheld, including address, city, ZIP, and GPS coordinates."
     ))
   }
   if (field %in% .hpai_premises_fields) {
@@ -653,7 +661,13 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
     if (is.na(raw)) {
       output_values[[i]] <- NA_character_
     } else if (identical(action, "SAFE_RETAIN")) {
-      output_values[[i]] <- if (identical(as.character(row$field_type[[1L]]), "Sig")) "signature_present" else trimws(raw)
+      output_values[[i]] <- if (identical(as.character(row$field_type[[1L]]), "Sig")) {
+        "signature_present"
+      } else if (as.character(row$field[[1L]]) %in% .hpai_retained_geography_fields) {
+        raw
+      } else {
+        trimws(raw)
+      }
     } else if (identical(action, "SAFE_NORMALIZE")) {
       output_values[[i]] <- .hpai_date(raw)
     } else if (identical(action, "PSEUDONYMIZE")) {
