@@ -266,6 +266,12 @@ utils::globalVariables(c(
 
 .hpai_nonmissing <- function(value) !is.na(value) & nzchar(trimws(as.character(value)))
 
+.hpai_canonical_field <- function(field) {
+  field <- as.character(field)
+  field[field == "NPIN"] <- "npin"
+  field
+}
+
 #' Validate extracted BCAP audit products
 #'
 #' validate_hpai applies only schema-supported checks. It permits the known
@@ -662,7 +668,7 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
   safe_fields <- fields |>
     dplyr::transmute(
       record_id = records$record_id[match(audit_id, records$source_key)],
-      field_index = as.integer(field_index), page = as.integer(page), field = as.character(field),
+      field_index = as.integer(field_index), page = as.integer(page), field = .hpai_canonical_field(field),
       field_type = as.character(field_type), states = as.character(states), options = as.character(options),
       is_populated = !is.na(output_values) & nzchar(output_values), value = output_values,
       privacy_class = as.character(privacy_class), privacy_action = as.character(privacy_action),
@@ -700,7 +706,7 @@ deidentify_hpai <- function(out_dir, deidentified_dir, crosswalk_dir, overwrite 
   write_csv_utf8(policy, fs::path(temp_safe, "privacy", "policy_snapshot.csv"))
   audit <- safe_fields |>
     dplyr::count(field, privacy_class, privacy_action, identifier_class, name = "n_output_rows") |>
-    dplyr::left_join(fields |> dplyr::filter(.hpai_nonmissing(value)) |> dplyr::count(field, name = "n_input_nonmissing"), by = "field") |>
+    dplyr::left_join(fields |> dplyr::filter(.hpai_nonmissing(value)) |> dplyr::mutate(field = .hpai_canonical_field(field)) |> dplyr::count(field, name = "n_input_nonmissing"), by = "field") |>
     dplyr::mutate(n_input_nonmissing = dplyr::coalesce(n_input_nonmissing, 0L), n_output_nonmissing = n_output_rows)
   write_csv_utf8(audit, fs::path(temp_safe, "privacy", "deidentification_audit.csv"))
   write_csv_utf8(privacy_audit, fs::path(temp_safe, "privacy", "privacy_leak_audit.csv"))

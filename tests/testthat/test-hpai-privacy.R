@@ -66,7 +66,24 @@ test_that("fields outside the versioned template are withheld", {
   expect_identical(bcapture:::.hpai_field_policy("Q_2_5source1a", "Ch")$privacy_class, "WITHHOLD")
   expect_identical(bcapture:::.hpai_field_policy("Q1_3_17e", "Btn")$privacy_class, "SAFE_RETAIN")
   expect_identical(bcapture:::.hpai_field_policy("NPIN", "Tx")$privacy_class, "PSEUDONYMIZE")
+  expect_identical(bcapture:::.hpai_canonical_field(c("NPIN", "npin")), c("npin", "npin"))
   expect_true("NPIN" %in% field_metadata("bcap")$field_name)
+})
+
+test_that("recognized BCAP source aliases use canonical safe field names", {
+  root <- tempfile("bcap-hpai-source-alias-")
+  hpai_test_products(root)
+  fields_path <- file.path(root, "combined", "hpai_fields_long.csv")
+  fields <- readr::read_csv(fields_path, show_col_types = FALSE)
+  fields$field[fields$field == "npin"] <- "NPIN"
+  readr::write_csv(fields, fields_path, na = "")
+  safe <- tempfile("bcap-safe-source-alias-")
+  crosswalk <- tempfile("bcap-crosswalk-source-alias-")
+  result <- bcapture::deidentify_hpai(root, safe, crosswalk, quiet = TRUE)
+  expect_identical(result$status, "passed")
+  safe_fields <- readr::read_csv(file.path(safe, "combined", "hpai_fields_long.csv"), show_col_types = FALSE)
+  expect_true("npin" %in% safe_fields$field)
+  expect_false("NPIN" %in% safe_fields$field)
 })
 
 test_that("BCAP semantic validation and strict finalization pass synthetic records", {
